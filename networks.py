@@ -22,10 +22,10 @@ class SpadeNetworkNoEnc(nn.Module):
 
     def __init__(self, args):
         super().__init__()
-        self.spade_network_noenc = SpadeGenerator(args)
+        self.spade_generator = SpadeGenerator(args)
 
     def forward(self, rgbd, mask, z):
-        return self.spade_network_noenc(rgbd, mask, z)
+        return self.spade_generator(rgbd, mask, z)
 
 
 class SpadeGenerator(nn.Module):
@@ -35,7 +35,7 @@ class SpadeGenerator(nn.Module):
         self.args = args
         self.init_h = 5
         self.init_w = 8
-        self.fc_expand_z = nn.Linear(self.args.embedding_size, 16*self.args.num_channel*self.init_h*self.init_w)
+        self.linear = Dense(self.args.embedding_size, 16*self.args.num_channel*self.init_h*self.init_w)
         self.head = SpadeResBlock(args,
                                     channel_in=16*self.args.num_channel,
                                     channel_out=16*self.args.num_channel,
@@ -92,7 +92,7 @@ class SpadeGenerator(nn.Module):
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
-        self.sn_conv = nn.utils.spectral_norm(nn.Conv2d(self.args.num_channel, 3, kernel_size=3, stride=1, bias=True))
+        self.conv = nn.utils.spectral_norm(nn.Conv2d(self.args.num_channel, 4, kernel_size=3, stride=1, bias=True))
 
     def forward(self, rgbd, mask, z):
         """
@@ -107,7 +107,7 @@ class SpadeGenerator(nn.Module):
         img = torch.cat([img, mask], dim=1)
 
         batch_size, unused_c, im_height, im_width = rgbd.shape
-        x = self.fc_expand_z(z).view(batch_size, 16*self.args.num_channel, self.init_h, self.init_w)
+        x = self.linear(z).view(batch_size, 16*self.args.num_channel, self.init_h, self.init_w)
 
         x = self.head(x, img)
         x = F.interpolate(x, scale_factor=2)
@@ -127,9 +127,18 @@ class SpadeGenerator(nn.Module):
 
         x = F.leaky_relu(x, 0.2)
         x = sn_conv_padding(x, stride=1, kernel_size=3)
-        x = self.sn_conv(x)
+        x = self.conv(x)
         x = torch.tanh(x)
         return 0.5 * (x + 1)
+
+
+class Dense(nn.Module):
+    def __init__(self, input_channel, output_channel):
+        super().__init__()
+        self.dense = nn.Linear(input_channel, output_channel)
+
+    def forward(self, x):
+        return self.dense(x)
 
 
 class SpadeEncoder(nn.Module):
@@ -156,8 +165,8 @@ class SpadeEncoder(nn.Module):
         self.conv_5 = nn.utils.spectral_norm(nn.Conv2d(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True))
         self.inst_norm_5 = torch.nn.InstanceNorm2d(8 * num_channel)
         
-        self.linear_mu = nn.Linear(1536, self.args.embedding_size)
-        self.linear_logvar = nn.Linear(1536, self.args.embedding_size)
+        self.linear_mu = Dense(1536, self.args.embedding_size)
+        self.linear_logvar = Dense(1536, self.args.embedding_size)
 
     def forward(self, x, return_intermediate=False):
         """Encoder that outputs global N(mu, sig) parameters.
@@ -207,7 +216,6 @@ class SpadeEncoder(nn.Module):
         features = features.reshape(bs, -1)
         mu = self.linear_mu(features)
         logvar = self.linear_logvar(features)
-
         return mu, logvar
 
     def reparameterize(self, mu, logvar):
@@ -240,8 +248,8 @@ class SpadeResBlock(nn.Module):
         self.conv_1 = nn.utils.spectral_norm(nn.Conv2d(channel_middle, channel_middle, kernel_size=3, stride=1, bias=True))
 
         if self.channel_in != self.channel_out:
-            self.shortcut_spade = Spade(args, channel_middle, in_channel=in_channel)
-            self.shortcut_conv = nn.utils.spectral_norm(nn.Conv2d(channel_middle, channel_out, kernel_size=3, stride=1, bias=False))
+            self.shortcut_spade = Spade(args, channel_in, in_channel=in_channel)
+            self.shortcut_conv = nn.utils.spectral_norm(nn.Conv2d(channel_in, channel_out, kernel_size=1, stride=1, bias=False))
 
     def forward(self, tensor, condition):
         x = F.leaky_relu(self.spade_0(tensor, condition), 0.2)
@@ -253,13 +261,28 @@ class SpadeResBlock(nn.Module):
         x = self.conv_1(x)
 
         if self.channel_in != self.channel_out:
-            x_in = F.leaky_relu(self.shortcut_spade(x, condition), 0.2)
-            x_in = sn_conv_padding(x_in, stride=1, kernel_size=3)
+            x_in = F.leaky_relu(self.shortcut_spade(tensor, condition), 0.2)
+            x_in = sn_conv_padding(x_in, stride=1, kernel_size=1)
             x_in = self.shortcut_conv(x_in)
         else:
             x_in = x
         out = x + x_in
         return out
+
+
+class Conv2D(nn.Module):
+
+    def __init__(self, input_channel, output_channel, kernel_size, stride, bias, use_spectrual_norm):
+        super().__init__()
+        self.conv2d = nn.Conv2d(input_channel, output_channel,
+                                kernel_size=kernel_size,
+                                stride=stride,
+                                bias=bias)
+        if use_spectrual_norm:
+            self.conv2d = nn.utils.spectral_norm(self.conv2d)
+
+    def forward(self, x):
+        return self.conv2d(x)
 
 
 class Spade(nn.Module):
@@ -270,14 +293,10 @@ class Spade(nn.Module):
         self.num_hidden = self.args.num_hidden
         self.channel_size = channel_size
         self.instance_norm = torch.nn.InstanceNorm2d(channel_size)
-        self.conv_cond = nn.utils.spectral_norm(
-            nn.Conv2d(in_channel, self.num_hidden, kernel_size=3, stride=1, bias=True))
+        self.conv_cond = Conv2D(in_channel, self.num_hidden, kernel_size=3, stride=1, bias=True, use_spectrual_norm=True)
 
-        # padding_mode='zeros',
-        self.gamma = nn.Conv2d(self.num_hidden, channel_size, kernel_size=3, stride=1, bias=True)
-
-        # padding_mode='zeros',
-        self.beta = nn.Conv2d(self.num_hidden, channel_size, kernel_size=3, stride=1, bias=True)
+        self.gamma = Conv2D(self.num_hidden, channel_size, kernel_size=3, stride=1, bias=True, use_spectrual_norm=False)
+        self.beta = Conv2D(self.num_hidden, channel_size, kernel_size=3, stride=1, bias=True, use_spectrual_norm=False)
 
     def forward(self, x, condition):
         h, w = x.shape[-2:]

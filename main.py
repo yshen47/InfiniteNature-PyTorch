@@ -1,10 +1,7 @@
 from networks import Generator
-import os
-from pprint import pprint
-import tensorflow as tf
 import configargparse
 import torch
-import re
+from network_utils import load_pretrained_weights_from_tensorflow_to_pytorch
 
 
 def config_parser(cmd=None):
@@ -99,37 +96,7 @@ if __name__ == '__main__':
     args = config_parser()
     model = Generator(args)
 
-    # tf_path = os.path.abspath('./ckpt/model.ckpt-6935893')  # Path to our TensorFlow checkpoint
-    # init_vars = tf.train.list_variables(tf_path)
-    # tf_vars = []
-    # for name, shape in init_vars:
-    #     print("Loading TF weight {} with shape {}".format(name, shape))
-    #     array = tf.train.load_variable(tf_path, name)
-    #     tf_vars.append((name, array.squeeze()))
-
-    # # For each variable in the PyTorch model
-    # for name, array in tf_vars:
-    #     if name.split('/')[0] != 'generator':
-    #         continue
-    #     # skip the prefix ('generator/') and split the path-like variable name in a list of sub-path
-    #     name = name[10:].split('/')
-    #
-    #     # Initiate the pointer from the main model class
-    #     pointer = model
-    #
-    #     # We iterate along the scopes and move our pointer accordingly
-    #     for m_name in name:
-    #         pointer = getattr(pointer, m_name)
-    #         pass
-    #     try:
-    #         assert pointer.shape == array.shape  # Catch error if the array shapes are not identical
-    #     except AssertionError as e:
-    #         e.args += (pointer.shape, array.shape)
-    #         raise
-    #
-    #     print("Initialize PyTorch weight {}".format(name))
-    #     pointer.data = torch.from_numpy(array)
-
+    model = load_pretrained_weights_from_tensorflow_to_pytorch(model)
     rendered_rgbd = torch.rand([2, 4, 160, 256])
     encoding = torch.rand([2, 4, 160, 256])
     mask = torch.rand([2, 1, 160, 256])
