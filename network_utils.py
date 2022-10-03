@@ -30,7 +30,7 @@ def load_pretrained_weights_from_tensorflow_to_pytorch(model):
         tf_vars.append((name, array.squeeze()))
 
     for name, array in tf_vars:
-        if name.split('/')[0] != 'generator' or 'Adam' in name or 'shortcut' in name:
+        if name.split('/')[0] != 'generator' or 'Adam' in name:
             print(f'Excluded weights: {name} {array.shape}')
             continue
 
@@ -44,6 +44,9 @@ def load_pretrained_weights_from_tensorflow_to_pytorch(model):
                 pointer = getattr(pointer, 'weight')
                 if len(pointer.shape) == 4:
                     # TODO: it might also be (3, 2, 0, 1), which needs double-checking
+                    if len(array.shape) != 4:
+                        # kernel size is 1x1
+                        array = array[None, None]
                     array = array.transpose(3, 2, 1, 0)
                 elif len(pointer.shape) == 2:
                     array = array.transpose(1, 0)
