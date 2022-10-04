@@ -13,10 +13,13 @@ class Generator(nn.Module):
         self.spade_network_noenc = SpadeNetworkNoEnc(args)
 
     def forward(self, rgbd, mask, encoding):
-        mu, logvar = self.spade_encoder(encoding)
-        z = self.spade_encoder.reparameterize(mu, logvar)
+        z = self.style_encoding(encoding)
         return self.spade_network_noenc(rgbd, mask, z)
 
+    def style_encoding(self, encoding):
+        mu, logvar = self.spade_encoder(encoding)
+        z = self.spade_encoder.reparameterize(mu, logvar)
+        return z
 
 class SpadeNetworkNoEnc(nn.Module):
 

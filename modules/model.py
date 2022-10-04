@@ -1,16 +1,47 @@
 from modules.generator import Generator
 from modules.discriminator import PatchDiscriminator
-from torch import nn
 import torch
+import pytorch_lightning as pl
 
 
-class InfiniteNature(nn.Module):
+class InfiniteNature(pl.LightningModule):
 
-    def __init__(self, args):
+    def __init__(self, generator_config, loss_config):
         super().__init__()
-        self.generator = Generator(args)
+        self.generator = Generator(generator_config)
         self.spade_discriminator_0 = PatchDiscriminator()
         self.spade_discriminator_1 = PatchDiscriminator()
+
+    def configure_optimizers(self):
+        lr = self.learning_rate
+        if self.phase == 'codebook':
+            opt_ae_parameters = list(self.encoder.parameters()) + \
+                                      list(self.decoder.parameters()) + \
+                                      list(self.quantize.parameters()) + \
+                                      list(self.quant_conv.parameters()) + \
+                                      list(self.post_quant_conv.parameters())
+            if self.use_extrapolation_mask:
+                opt_ae_parameters = opt_ae_parameters + list(self.conv_in.parameters())
+            opt_ae = torch.optim.Adam(opt_ae_parameters,
+                                      lr=lr, betas=(0.5, 0.9))
+        elif self.phase == 'conditional_generation':
+            opt_ae = torch.optim.Adam(list(self.encoder.parameters()) + list(self.conv_in.parameters()) if self.use_extrapolation_mask else
+                                      list(self.encoder.parameters()),
+                                       lr=lr, betas=(0.5, 0.9))
+        else:
+            raise NotImplementedError
+        if self.loss.use_discriminative_loss:
+            opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(),
+                                    lr=lr, betas=(0.5, 0.9))
+            return opt_ae, opt_disc #[opt_ae, opt_disc], []
+        else:
+            return opt_ae #[opt_ae, ], []
+
+    def training_step(self, batch, batch_idx):
+        pass
+
+    def validation_step(self, batch, batch_idx):
+        pass
 
     def forward(self, rendered_rgbd, mask, encoding):
         predicted_rgbd = self.generator(rendered_rgbd, mask, encoding)
