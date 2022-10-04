@@ -4,16 +4,13 @@ import tarfile
 import urllib
 import zipfile
 from pathlib import Path
-from data import kitti360, google_earth, blender_3d, custom_codebook
-import numpy as np
-import torch
 import wandb
 from data.utils.helper_types import Annotation
 from torch._six import string_classes
 from torch.utils.data._utils.collate import np_str_obj_array_pattern, default_collate_err_msg_format
 from tqdm import tqdm
 
-import argparse, os, sys, datetime, glob, importlib
+import argparse, os, importlib
 from omegaconf import OmegaConf
 import numpy as np
 from PIL import Image
@@ -21,14 +18,9 @@ import torch
 import torchvision
 from torch.utils.data import DataLoader, Dataset
 import pytorch_lightning as pl
-from pytorch_lightning import seed_everything
 from pytorch_lightning.trainer import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
+from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities.distributed import rank_zero_only
-# torch.backends.cudnn.benchmark = False
-# torch.backends.cudnn.enabled = False
-# torch.cuda.set_device(0)
-
 
 
 class CheckpointEveryNSteps(pl.Callback):
@@ -190,96 +182,37 @@ class WrappedDataset(Dataset):
 
 
 class DataModuleFromConfig(pl.LightningDataModule):
-    def __init__(self, batch_size, phase=None,
-                 wrap=False, num_workers=None, n_src=None, dataset=None, dataset_dir=None, use_depth=None,
+    def __init__(self, batch_size,
+                 wrap=False, num_workers=None, dataset=None, dataset_dir=None, use_depth=None,
                  image_resolution=None, depth_range=None):
         super().__init__()
         self.batch_size = batch_size
         self.dataset_configs = dict()
         self.num_workers = num_workers if num_workers is not None else batch_size*2
-        self.phase = phase
-        if phase == 'conditional_generation':
-            if dataset == 'kitti360':
-                train = {
-                    "target": "data.kitti360.Kitti360Train",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'n_src': n_src,
-                    }
-                }
-                validation = {
-                    "target": "data.kitti360.Kitti360Validation",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'n_src': n_src,
-                    }
-                }
-
-            elif dataset == 'google_earth':
-                train = {
-                    "target": "data.google_earth.GoogleEarthTrain",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'image_resolution': list(image_resolution),
-                        'n_src': n_src,
-                    }
-                }
-                validation = {
-                    "target": "data.google_earth.GoogleEarthValidation",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'image_resolution': list(image_resolution),
-                        'n_src': n_src,
-                    }
-                }
-            elif dataset == 'clevr-infinite':
-                train = {
-                    "target": "data.blender_3d.Blender3dTrain",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'image_resolution': image_resolution,
-                        'n_src': n_src,
-                    }
-                }
-                validation = {
-                    "target": "data.blender_3d.Blender3dValidation",
-                    "params": {
-                        'dataset': dataset,
-                        'dataset_dir': dataset_dir,
-                        'image_resolution': image_resolution,
-                        'n_src': n_src,
-                    }
-                }
-            else:
-                raise NotImplementedError
-        elif phase == 'codebook':
+        if dataset == 'google_earth':
             train = {
-                "target": "data.custom_codebook.CustomTrain",
+                "target": "data.google_earth.GoogleEarthTrain",
                 "params": {
                     'dataset': dataset,
-                    'image_resolution': list(image_resolution),
                     'dataset_dir': dataset_dir,
-                    'images_list_file': dataset_dir + "/train.txt",
-                    "use_depth": use_depth,
-                    "convert_depth_flag": 'clevr-infinite' == dataset,
-                    "depth_range": depth_range
+                    'image_resolution': list(image_resolution)
                 }
             }
             validation = {
-                "target": "data.custom_codebook.CustomValidation",
+                "target": "data.google_earth.GoogleEarthValidation",
                 "params": {
                     'dataset': dataset,
-                    'image_resolution': list(image_resolution),
                     'dataset_dir': dataset_dir,
-                    'images_list_file': dataset_dir + "/val.txt",
-                    "use_depth": use_depth,
-                    "convert_depth_flag": 'clevr-infinite' == dataset,
-                    "depth_range": depth_range
+                    'image_resolution': list(image_resolution)
+                }
+            }
+
+            test = {
+                "target": "data.google_earth.GoogleEarthTest",
+                "params": {
+                    'dataset': dataset,
+                    'dataset_dir': dataset_dir,
+                    'image_resolution': list(image_resolution)
                 }
             }
         else:
@@ -291,8 +224,6 @@ class DataModuleFromConfig(pl.LightningDataModule):
         if validation is not None:
             self.dataset_configs["validation"] = validation
             self.val_dataloader = self._val_dataloader
-
-        test = validation # TODO: to change later
         if test is not None:
             self.dataset_configs["test"] = test
             self.test_dataloader = self._test_dataloader

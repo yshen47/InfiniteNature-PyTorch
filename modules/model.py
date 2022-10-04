@@ -2,46 +2,131 @@ from modules.generator import Generator
 from modules.discriminator import PatchDiscriminator
 import torch
 import pytorch_lightning as pl
+from modules.warp import render_projection_from_srcs_fast
+import tensorflow as tf
+import os
 
 
 class InfiniteNature(pl.LightningModule):
 
-    def __init__(self, generator_config, loss_config):
+    def __init__(self, generator_config, loss_config, data_config, learning_rate, ckpt_path=None, ignore_keys=()):
         super().__init__()
+        self.generator_config = generator_config
+        self.loss_config = loss_config
+        self.data_config = data_config
+        self.learning_rate = learning_rate
         self.generator = Generator(generator_config)
         self.spade_discriminator_0 = PatchDiscriminator()
         self.spade_discriminator_1 = PatchDiscriminator()
+        if ckpt_path is None:
+            self.load_pretrained_weights_from_tensorflow_to_pytorch()
+        else:
+            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
 
     def configure_optimizers(self):
         lr = self.learning_rate
-        if self.phase == 'codebook':
-            opt_ae_parameters = list(self.encoder.parameters()) + \
-                                      list(self.decoder.parameters()) + \
-                                      list(self.quantize.parameters()) + \
-                                      list(self.quant_conv.parameters()) + \
-                                      list(self.post_quant_conv.parameters())
-            if self.use_extrapolation_mask:
-                opt_ae_parameters = opt_ae_parameters + list(self.conv_in.parameters())
-            opt_ae = torch.optim.Adam(opt_ae_parameters,
-                                      lr=lr, betas=(0.5, 0.9))
-        elif self.phase == 'conditional_generation':
-            opt_ae = torch.optim.Adam(list(self.encoder.parameters()) + list(self.conv_in.parameters()) if self.use_extrapolation_mask else
-                                      list(self.encoder.parameters()),
-                                       lr=lr, betas=(0.5, 0.9))
-        else:
-            raise NotImplementedError
-        if self.loss.use_discriminative_loss:
-            opt_disc = torch.optim.Adam(self.loss.discriminator.parameters(),
-                                    lr=lr, betas=(0.5, 0.9))
-            return opt_ae, opt_disc #[opt_ae, opt_disc], []
-        else:
-            return opt_ae #[opt_ae, ], []
+        opt_g = torch.optim.Adam(self.generator.parameters(),
+                                lr=lr, betas=(0.5, 0.9))
+        opt_disc = torch.optim.Adam(list(self.spade_discriminator_0.parameters()) +
+                                    list(self.spade_discriminator_1.parameters()),
+                                lr=lr, betas=(0.5, 0.9))
+        return opt_g, opt_disc
+
+    def init_from_ckpt(self, path, ignore_keys=('loss')):
+        sd = torch.load(path, map_location="cpu")["state_dict"]
+        keys = list(sd.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                #print(ik, k)
+                if k.startswith(ik):
+                    # print("Deleting key {} from state_dict.".format(k))
+                    del sd[k]
+        self.load_state_dict(sd, strict=False)
+        print(f"Restored from {path}")
+
+    def load_pretrained_weights_from_tensorflow_to_pytorch(self):
+        tf_path = os.path.abspath('./ckpt/model.ckpt-6935893')  # Path to our TensorFlow checkpoint
+        init_vars = tf.train.list_variables(tf_path)
+        tf_vars = []
+        for name, shape in init_vars:
+            array = tf.train.load_variable(tf_path, name)
+            tf_vars.append((name, array.squeeze()))
+
+        for name, array in tf_vars:
+            if not ('generator' in name or 'discriminator' in name):
+                print(f'Excluded weights: {name} {array.shape}')
+                continue
+
+            if 'Adam' in name:
+                print(f'Excluded weights: {name} {array.shape}')
+                continue
+
+            pointer = self
+            if name.split('/')[-1] in ['u']:
+                print(f'Excluded weights: {name}')
+                continue
+            name = name.split('/')
+            for m_name in name:
+                if m_name == 'kernel':
+                    pointer = getattr(pointer, 'weight')
+                    if len(pointer.shape) == 4:
+                        # TODO: it might also be (3, 2, 0, 1), which needs double-checking
+                        if len(array.shape) == 2:
+                            # kernel size is 1x1
+                            array = array[None, None]
+                        elif len(array.shape) == 3:
+                            array = array[..., None]
+                        array = array.transpose(3, 2, 1, 0)
+                    elif len(pointer.shape) == 2:
+                        array = array.transpose(1, 0)
+                elif m_name == 'bias':
+                    pointer = getattr(pointer, 'bias')
+                    if len(array.shape) == 0:
+                        array = array[None,]
+                else:
+                    pointer = getattr(pointer, m_name)
+
+            try:
+                assert pointer.shape == array.shape  # Catch error if the array shapes are not identical
+            except AssertionError as e:
+                e.args += (pointer.shape, array.shape)
+                raise
+
+            # print("Initialize PyTorch weight {}".format(name))
+            pointer.data = torch.from_numpy(array)
 
     def training_step(self, batch, batch_idx):
-        pass
+        x_src = torch.cat([batch['src_img'],
+                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+        z = self.generator.style_encoding(x_src)
+        rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
+                                                          x_src[:, 3][:, None],
+                                                          batch["Ks"][:, 0],
+                                                          batch["Ks"][:, 0],
+                                                          batch['T_src2tgt'])
+        predicted_rgbd, generated_features, generated_logits = self(rendered_rgbd, mask, z)
 
     def validation_step(self, batch, batch_idx):
-        pass
+        x_src = torch.cat([batch['src_img'],
+                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+        z = self.generator.style_encoding(x_src)
+        rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
+                                                          x_src[:, 3][:, None],
+                                                          batch["Ks"][:, 0],
+                                                          batch["Ks"][:, 0],
+                                                          batch['T_src2tgt'])
+        predicted_rgbd, generated_features, generated_logits = self(rendered_rgbd, mask, z)
+
+    def render_with_projection(self, x_src, dm_src, K_src, K_next, T_src2tgt):
+        warped_depth, warped_features, extrapolation_mask = render_projection_from_srcs_fast(
+            x_src,
+            dm_src,
+            K_next.to(self.device),
+            K_src.to(self.device),
+            T_src2tgt,
+            src_num=x_src.shape[1])
+        warped_rgbd = torch.cat([warped_features, warped_depth], dim=1)
+        return warped_rgbd, 1-extrapolation_mask
 
     def forward(self, rendered_rgbd, mask, encoding):
         predicted_rgbd = self.generator(rendered_rgbd, mask, encoding)

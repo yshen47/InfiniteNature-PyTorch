@@ -1,8 +1,7 @@
 import torch
 
 from modules.model import InfiniteNature
-from config import config_parser
-from modules.network_utils import load_pretrained_weights_from_tensorflow_to_pytorch
+from configs.config import config_parser
 import subprocess
 import os
 import pickle

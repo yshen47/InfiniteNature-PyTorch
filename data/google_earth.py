@@ -28,9 +28,10 @@ class PRNGMixin(object):
 
 
 class GoogleEarthBase(Dataset, PRNGMixin):
-    def __init__(self, split, n_src=2, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+    def __init__(self, split, dataset_dir=None, dataset=None, image_resolution=None,
+                 depth_range=None, use_extrapolation_mask=None):
         self.split = split
-        self.src_num = n_src
+        self.src_num = 1
         self.use_extrapolation_mask = use_extrapolation_mask
         self.depth_range = depth_range
         self.dataset = dataset
@@ -115,8 +116,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         return g
 
     def __len__(self):
-        #return 100 if self.split == 'train' else 10
-        return self.cumulative_sum[-1] #if self.split == 'train' else 3000
+        return self.cumulative_sum[-1]
 
     def parse_idx(self, idx):
         for img_index, cur_cumsum in enumerate(self.cumulative_sum):
@@ -147,8 +147,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         dm_srcs = [np.load(src_node['depth_path']) for src_node in src_nodes]
         R_dst = tgt_node["R"]
         t_dst = tgt_node["t"]
-        R_rels = []
-        t_rels = []
+        T_rels = []
         Ks = []
         K_invs = []
         T_tgt = np.eye(4)
@@ -167,10 +166,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             T_src[:3, :3] = R_src
             T_src[:3, 3] = t_src
             T_rel = T_tgt @ np.linalg.inv(T_src)
-            R_rel = T_rel[:3, :3]
-            t_rel = T_rel[:3, 3]
-            R_rels.append(R_rel)
-            t_rels.append(t_rel)
+            T_rels.append(T_rel)
             Ks.append(K)
             K_invs.append(np.linalg.inv(K))
 
@@ -194,55 +190,42 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         mask[:src_num] = 1
         while len(K_invs) < self.src_num:
             Ks.append(np.eye(3))
-            K_invs.append(np.eye(3))
-            R_rels.append(np.eye(3))
-            t_rels.append(np.zeros(3))
             img_srcs.append(np.zeros_like(img_srcs[-1]))
             dm_srcs.append(np.zeros_like(dm_srcs[-1]))
             src_frame_ids.append(-1)
 
         example = {
             "Ks": np.stack(Ks),
-            "K_invs": np.stack(K_invs),
-            "R_rels": np.stack(R_rels),
             "tgt_frame_id": np.array([tgt_frame_id]),
-            "src_frame_ids": np.array(src_frame_ids),
-            "t_rels": np.stack(t_rels),
-            "dst_img": img_dst, # rgb or rgbid
-            "src_imgs": np.stack(img_srcs),
+            "src_frame_id": np.array([src_frame_ids[0]]),
+            "T_src2tgt": T_rels[0],
+            "dst_img": img_dst,
+            "src_img": img_srcs[0],
             "dst_depth": dm_dst[..., None],
-            "src_depths": np.stack(dm_srcs)[..., None],
-            'src_masks': mask,
-            'tgt_pixel_mask': (dm_dst != 65504)[ None, ]
+            "src_depth": dm_srcs[0][..., None],
         }
         for k in example:
             example[k] = example[k].astype(np.float32)
-
-        # example["dst_rgb_fname"] = tgt_node['rgb_path']
-        # example["src_rgb_fnames"] = [src_node['rgb_path'] for src_node in src_nodes]
-        # example["dst_depth_fname"] = tgt_node['depth_path']
-        # example["src_depth_fnames"] = [src_node['depth_path'] for src_node in src_nodes]
-
         return example
 
 
 class GoogleEarthTrain(GoogleEarthBase):
-    def __init__(self, size=None, n_src=2, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
-        super().__init__(split='train', n_src=n_src, dataset=dataset, dataset_dir=dataset_dir,
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+        super().__init__(split='train', dataset=dataset, dataset_dir=dataset_dir,
                          image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
         self.size = size
 
 
 class GoogleEarthValidation(GoogleEarthBase):
-    def __init__(self, size=None, n_src=2, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
-        super().__init__(split='val', n_src=n_src, dataset=dataset,  dataset_dir=dataset_dir,
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+        super().__init__(split='val', dataset=dataset,  dataset_dir=dataset_dir,
                          image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
         self.size = size
 
 
 class GoogleEarthTest(GoogleEarthBase):
-    def __init__(self, size=None, n_src=2, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
-        super().__init__(split='test', n_src=n_src, dataset_dir=dataset_dir, dataset=dataset,
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+        super().__init__(split='test',  dataset_dir=dataset_dir, dataset=dataset,
                          image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
         self.size = size
 
