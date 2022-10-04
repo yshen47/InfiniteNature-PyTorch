@@ -10,11 +10,9 @@ from modules.loss import *
 
 class InfiniteNature(pl.LightningModule):
 
-    def __init__(self, generator_config, loss_config, data_config, learning_rate, ckpt_path=None, ignore_keys=()):
+    def __init__(self, generator_config, learning_rate, ckpt_path=None, ignore_keys=()):
         super().__init__()
         self.generator_config = generator_config
-        self.loss_config = loss_config
-        self.data_config = data_config
         self.learning_rate = learning_rate
         self.generator = Generator(generator_config)
         self.spade_discriminator_0 = PatchDiscriminator()

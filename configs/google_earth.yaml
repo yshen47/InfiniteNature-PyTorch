@@ -11,9 +11,6 @@ model:
       num_channel: 32
       num_hidden: 128
 
-    loss_config:
-      perceptual_loss_weight: 1
-
 data:
   target: data.utils.utils.DataModuleFromConfig
   params:
