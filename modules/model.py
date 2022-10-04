@@ -3,8 +3,9 @@ from modules.discriminator import PatchDiscriminator
 import torch
 import pytorch_lightning as pl
 from modules.warp import render_projection_from_srcs_fast
-import tensorflow as tf
+from modules.lpips import LPIPS
 import os
+from modules.loss import *
 
 
 class InfiniteNature(pl.LightningModule):
@@ -18,6 +19,8 @@ class InfiniteNature(pl.LightningModule):
         self.generator = Generator(generator_config)
         self.spade_discriminator_0 = PatchDiscriminator()
         self.spade_discriminator_1 = PatchDiscriminator()
+        self.perceptual_loss = LPIPS().eval()
+        self.automatic_optimization = False
         if ckpt_path is None:
             self.load_pretrained_weights_from_tensorflow_to_pytorch()
         else:
@@ -98,24 +101,43 @@ class InfiniteNature(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
                            batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
-        z = self.generator.style_encoding(x_src)
+        gt_tgt_rgbd = torch.cat([batch['dst_img'],
+                           batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+        z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           x_src[:, 3][:, None],
                                                           batch["Ks"][:, 0],
                                                           batch["Ks"][:, 0],
                                                           batch['T_src2tgt'])
-        predicted_rgbd, generated_features, generated_logits = self(rendered_rgbd, mask, z)
+        predicted_rgbd = self(rendered_rgbd, mask, z)
+        # disc_on_generated = self.discriminate(predicted_rgbd)
+        # generated_features = [f[0] for f in disc_on_generated]
+        # generated_logits = [f[1] for f in disc_on_generated]
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss)
+        self.log_dict(loss_dict)
+
+        opt_ae, opt_disc = self.optimizers()
+        opt_ae.zero_grad()
+        loss_dict['total_generator_loss'].backward()
+        opt_ae.step()
+        opt_disc.zero_grad()
+        loss_dict['total_discriminator_loss'].backward()
+        opt_disc.step()
 
     def validation_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
                            batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
-        z = self.generator.style_encoding(x_src)
+        gt_tgt_rgbd = torch.cat([batch['dst_img'],
+                           batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+
+        z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           x_src[:, 3][:, None],
                                                           batch["Ks"][:, 0],
                                                           batch["Ks"][:, 0],
                                                           batch['T_src2tgt'])
-        predicted_rgbd, generated_features, generated_logits = self(rendered_rgbd, mask, z)
+        predicted_rgbd = self(rendered_rgbd, mask, z)
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss)
 
     def render_with_projection(self, x_src, dm_src, K_src, K_next, T_src2tgt):
         warped_depth, warped_features, extrapolation_mask = render_projection_from_srcs_fast(
@@ -132,21 +154,25 @@ class InfiniteNature(pl.LightningModule):
         predicted_rgbd = self.generator(rendered_rgbd, mask, encoding)
         refined_disparity = self.rescale_refined_disparity(rendered_rgbd[:, 3:], mask, predicted_rgbd[:, 3:])
         predicted_rgbd = torch.cat([predicted_rgbd[:, :3], refined_disparity], axis=1)
+        return predicted_rgbd
 
-        disc_on_generated = self.discriminate(predicted_rgbd)
-        generated_features = [f[0] for f in disc_on_generated]
-        generated_logits = [f[1] for f in disc_on_generated]
-
-        return predicted_rgbd, generated_features, generated_logits
-
-    def discriminate(self, predicted_rgbd):
-        features, logit = self.spade_discriminator_0(predicted_rgbd)
+    def discriminate(self, rgbd, use_for_discriminator_loss=False):
+        if use_for_discriminator_loss:
+            rgbd = rgbd.detach()
+        else:
+            self.spade_discriminator_0.eval()
+            self.spade_discriminator_1.eval()
+        features, logit = self.spade_discriminator_0(rgbd)
 
         # half size by averaging each four pixels
-        x_small = (predicted_rgbd[:, :, 0::2, 0::2] + predicted_rgbd[:, :, 0::2, 1::2]
-                   + predicted_rgbd[:, :, 1::2, 0::2] + predicted_rgbd[:, :, 1::2, 1::2]) / 4
+        x_small = (rgbd[:, :, 0::2, 0::2] + rgbd[:, :, 0::2, 1::2]
+                   + rgbd[:, :, 1::2, 0::2] + rgbd[:, :, 1::2, 1::2]) / 4
 
         features_small, logit_small = self.spade_discriminator_1(x_small)
+
+        if not use_for_discriminator_loss:
+            self.spade_discriminator_0.train()
+            self.spade_discriminator_1.train()
         return [features, features_small], [logit, logit_small]
 
     def rescale_refined_disparity(self, rendered_disparity, input_mask, refined_disparity):
