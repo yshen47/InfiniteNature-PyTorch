@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.nn import functional as F
 from torch import nn
-from network_utils import sn_conv_padding
+from modules.network_utils import sn_conv_padding, Dense, Conv2D
 
 
 class Generator(nn.Module):
@@ -132,13 +132,7 @@ class SpadeGenerator(nn.Module):
         return 0.5 * (x + 1)
 
 
-class Dense(nn.Module):
-    def __init__(self, input_channel, output_channel):
-        super().__init__()
-        self.dense = nn.Linear(input_channel, output_channel)
 
-    def forward(self, x):
-        return self.dense(x)
 
 
 class SpadeEncoder(nn.Module):
@@ -268,21 +262,6 @@ class SpadeResBlock(nn.Module):
             x_in = x
         out = x + x_in
         return out
-
-
-class Conv2D(nn.Module):
-
-    def __init__(self, input_channel, output_channel, kernel_size, stride, bias, use_spectrual_norm):
-        super().__init__()
-        self.conv2d = nn.Conv2d(input_channel, output_channel,
-                                kernel_size=kernel_size,
-                                stride=stride,
-                                bias=bias)
-        if use_spectrual_norm:
-            self.conv2d = nn.utils.spectral_norm(self.conv2d)
-
-    def forward(self, x):
-        return self.conv2d(x)
 
 
 class Spade(nn.Module):

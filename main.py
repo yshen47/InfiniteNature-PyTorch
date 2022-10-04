@@ -1,8 +1,8 @@
-from generator import Generator
+from modules.model import InfiniteNature
 import configargparse
 import torch
-from network_utils import load_pretrained_weights_from_tensorflow_to_pytorch
-from discriminator import MultiscaleDiscriminator
+from modules.network_utils import load_pretrained_weights_from_tensorflow_to_pytorch
+
 
 def config_parser(cmd=None):
     parser = configargparse.ArgumentParser()
@@ -94,19 +94,12 @@ def config_parser(cmd=None):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     args = config_parser()
-    g = Generator(args)
-    d = MultiscaleDiscriminator()
-    g = load_pretrained_weights_from_tensorflow_to_pytorch(g)
+    model = InfiniteNature(args)
+    g = load_pretrained_weights_from_tensorflow_to_pytorch(model)
     rendered_rgbd = torch.rand([2, 4, 160, 256])
     encoding = torch.rand([2, 4, 160, 256])
     mask = torch.rand([2, 1, 160, 256])
-    predicted_rgbd = g(rendered_rgbd, mask, encoding)
-    print(predicted_rgbd.shape)
-
-    disc_on_generated = d(predicted_rgbd)
-    generated_features = [f[0] for f in disc_on_generated]
-    generated_logits = [f[1] for f in disc_on_generated]
-
+    predicted_rgbd, generated_features, generated_logits = g(rendered_rgbd, mask, encoding)
     print("Finished!")
 
 
