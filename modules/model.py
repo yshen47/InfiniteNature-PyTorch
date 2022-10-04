@@ -1,6 +1,7 @@
 from modules.generator import Generator
 from modules.discriminator import PatchDiscriminator
 from torch import nn
+import torch
 
 
 class InfiniteNature(nn.Module):
@@ -13,6 +14,8 @@ class InfiniteNature(nn.Module):
 
     def forward(self, rendered_rgbd, mask, encoding):
         predicted_rgbd = self.generator(rendered_rgbd, mask, encoding)
+        refined_disparity = self.rescale_refined_disparity(rendered_rgbd[:, 3:], mask, predicted_rgbd[:, 3:])
+        predicted_rgbd = torch.cat([predicted_rgbd[:, :3], refined_disparity], axis=1)
 
         disc_on_generated = self.discriminate(predicted_rgbd)
         generated_features = [f[0] for f in disc_on_generated]
@@ -29,3 +32,25 @@ class InfiniteNature(nn.Module):
 
         features_small, logit_small = self.spade_discriminator_1(x_small)
         return [features, features_small], [logit, logit_small]
+
+    def rescale_refined_disparity(self, rendered_disparity, input_mask, refined_disparity):
+        """Rescales the refined disparity to match the input's scale.
+        This is done to prevent drifting in the disparity. We match the scale
+        by solving a least squares optimization.
+        Args:
+          rendered_disparity: [B, H, W, 1] disparity produced by the render step
+          input_mask: [B, H, W, 1] a mask with 1's denoting regions that were
+            visible through the rendering.
+          refined_disparity: [B, H, W, 1] disparity of the refinement network output
+        Returns:
+          refined_disparity that has been scale and shifted to match the statistics
+          of rendered_disparity.
+        """
+        log_refined = torch.log(torch.clip(refined_disparity, 1e-2, 1))
+        log_rendered = torch.log(torch.clip(rendered_disparity, 1e-2, 1))
+        log_scale = torch.sum(input_mask * (log_rendered - log_refined)) / (
+                torch.sum(input_mask) + 1e-4)
+        scale = torch.exp(log_scale)
+        scaled_refined_disparity = torch.clip(scale * refined_disparity,
+                                                    0, 1)
+        return scaled_refined_disparity
