@@ -42,9 +42,10 @@ To run their similar Colab unrolling but using Pytorch, you can run the followin
 
 Feel free to modify the next pose to have more interesting trajectory. We manually check our output image for one-step extrapolation is exactly the same as those in Tensorflow
 
-## Train
-For each dataset, you need to first prepare a config file and write your own data loader. Make sure you follow our provided config and dataloader example on google_earth dataset. 
-The training is wrapped in Pytorch-lightning framework
+## Train on your own dataset
+For each dataset, we need to first prepare a config file and write a customized data loader. Make sure you follow our provided config and dataloader example for GoogleEarth-Infinite dataset. The training is wrapped in Pytorch-lightning framework
+
+For details about GoogleEarth-Infinite dataset, please check the paper [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
 
 ```angular2html 
     python train.py
