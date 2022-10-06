@@ -9,13 +9,13 @@ class PatchDiscriminator(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv = Conv2D(4, 64, kernel_size=4, stride=2, bias=True, use_spectrual_norm=False)
-        self.conv_1 = nn.utils.spectral_norm(nn.Conv2d(64, 128, kernel_size=4, stride=1, bias=True))
+        self.conv_1 = Conv2D(64, 128, kernel_size=4, stride=1, bias=True, use_spectrual_norm=True)
         self.inst_norm_1 = torch.nn.InstanceNorm2d(128)
 
-        self.conv_2 = nn.utils.spectral_norm(nn.Conv2d(128, 256, kernel_size=4, stride=1, bias=True))
+        self.conv_2 = Conv2D(128, 256, kernel_size=4, stride=1, bias=True, use_spectrual_norm=True)
         self.inst_norm_2 = torch.nn.InstanceNorm2d(256)
 
-        self.conv_3 = nn.utils.spectral_norm(nn.Conv2d(256, 512, kernel_size=4, stride=2, bias=True))
+        self.conv_3 = Conv2D(256, 512, kernel_size=4, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_3 = torch.nn.InstanceNorm2d(512)
         self.D_logit = Conv2D(512, 1, kernel_size=4, stride=1, bias=True, use_spectrual_norm=False)
 

@@ -6,6 +6,7 @@ from modules.warp import render_projection_from_srcs_fast
 from modules.lpips import LPIPS
 import os
 from modules.loss import *
+from modules.network_utils import Conv2D
 
 
 class InfiniteNature(pl.LightningModule):
@@ -63,13 +64,21 @@ class InfiniteNature(pl.LightningModule):
                 continue
 
             pointer = self
-            if name.split('/')[-1] in ['u']:
-                print(f'Excluded weights: {name}')
-                continue
-            name = name.split('/')
-            for m_name in name:
-                if m_name == 'kernel':
-                    pointer = getattr(pointer, 'weight')
+            # if name.split('/')[-1] in ['u']:
+            #     print(f'Excluded weights: {name} {array.shape}')
+            #     continue
+            if 'conv' in name:
+                name = name.split('/')
+                truncated_names = None
+                for i_m, m_name in enumerate(name):
+                    pointer = getattr(pointer, m_name)
+                    if isinstance(pointer, Conv2D):
+                        truncated_names = name[i_m+1:]
+                        if truncated_names[0] == 'conv2d':
+                            truncated_names = name[i_m + 2:]
+                        break
+                print(truncated_names)
+                if truncated_names[0] == 'kernel':
                     if len(pointer.shape) == 4:
                         # TODO: it might also be (3, 2, 0, 1), which needs double-checking
                         if len(array.shape) == 2:
@@ -77,24 +86,52 @@ class InfiniteNature(pl.LightningModule):
                             array = array[None, None]
                         elif len(array.shape) == 3:
                             array = array[..., None]
-                        array = array.transpose(3, 2, 1, 0)
+                        array = array.transpose(3, 2, 0, 1)
                     elif len(pointer.shape) == 2:
                         array = array.transpose(1, 0)
-                elif m_name == 'bias':
-                    pointer = getattr(pointer, 'bias')
+                    pointer.weight = torch.from_numpy(array)
+                elif truncated_names[0] == 'bias':
                     if len(array.shape) == 0:
                         array = array[None,]
+                    pointer.bias = torch.from_numpy(array)
+                elif truncated_names[0] == 'u':
+                    pointer.u = torch.from_numpy(array)
+            else:
+                name = name.split('/')
+                for m_name in name:
+                    if m_name == 'kernel':
+                        pointer = getattr(pointer, 'weight')
+                        if len(pointer.shape) == 4:
+                            # TODO: it might also be (3, 2, 0, 1), which needs double-checking
+                            if len(array.shape) == 2:
+                                # kernel size is 1x1
+                                array = array[None, None]
+                            elif len(array.shape) == 3:
+                                array = array[..., None]
+                            array = array.transpose(3, 2, 0, 1)
+                        elif len(pointer.shape) == 2:
+                            array = array.transpose(1, 0)
+                    elif m_name == 'bias':
+                        pointer = getattr(pointer, 'bias')
+                        if len(array.shape) == 0:
+                            array = array[None,]
+                    else:
+                        pointer = getattr(pointer, m_name)
+
+                try:
+                    if m_name != 'u':
+                        assert pointer.shape == array.shape  # Catch error if the array shapes are not identical
+                except AssertionError as e:
+                    e.args += (pointer.shape, array.shape)
+                    raise
+
+                # print("Initialize PyTorch weight {}".format(name))
+                if 'conv' not in name:
+                    pointer.data = torch.from_numpy(array)
                 else:
-                    pointer = getattr(pointer, m_name)
+                    pointer = torch.from_numpy(array)
 
-            try:
-                assert pointer.shape == array.shape  # Catch error if the array shapes are not identical
-            except AssertionError as e:
-                e.args += (pointer.shape, array.shape)
-                raise
-
-            # print("Initialize PyTorch weight {}".format(name))
-            pointer.data = torch.from_numpy(array)
+                print()
 
     def training_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],

@@ -96,7 +96,7 @@ class SpadeGenerator(nn.Module):
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
-        self.conv = nn.utils.spectral_norm(nn.Conv2d(self.args.num_channel, 4, kernel_size=3, stride=1, bias=True))
+        self.conv = Conv2D(self.args.num_channel, 4, kernel_size=3, stride=1, bias=True, use_spectrual_norm=True)
 
     def forward(self, rgbd, mask, z):
         """
@@ -136,31 +136,29 @@ class SpadeGenerator(nn.Module):
         return 0.5 * (x + 1)
 
 
-
-
-
 class SpadeEncoder(nn.Module):
 
     def __init__(self, args, num_channel=16):
         super().__init__()
         self.args = args
         self.num_channel = num_channel
-        self.conv_0 = nn.utils.spectral_norm(nn.Conv2d(4, num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_0 = Conv2D(4, num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_0 = torch.nn.InstanceNorm2d(num_channel)
 
-        self.conv_1 = nn.utils.spectral_norm(nn.Conv2d(num_channel, 2 * num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_1 = Conv2D(num_channel, 2 * num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_1 = torch.nn.InstanceNorm2d(2 * num_channel)
 
-        self.conv_2 = nn.utils.spectral_norm(nn.Conv2d(2 * num_channel, 4 * num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_2 = Conv2D(2 * num_channel, 4 * num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_2 = torch.nn.InstanceNorm2d(4 * num_channel)
 
-        self.conv_3 = nn.utils.spectral_norm(nn.Conv2d(4 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_3 = Conv2D(4 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
+
         self.inst_norm_3 = torch.nn.InstanceNorm2d(8 * num_channel)
 
-        self.conv_4 = nn.utils.spectral_norm(nn.Conv2d(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_4 = Conv2D(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_4 = torch.nn.InstanceNorm2d(8 * num_channel)
 
-        self.conv_5 = nn.utils.spectral_norm(nn.Conv2d(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True))
+        self.conv_5 = Conv2D(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True, use_spectrual_norm=True)
         self.inst_norm_5 = torch.nn.InstanceNorm2d(8 * num_channel)
         
         self.linear_mu = Dense(1536, self.args.embedding_size)
@@ -240,14 +238,14 @@ class SpadeResBlock(nn.Module):
         channel_middle = min(channel_in, channel_out)
 
         self.spade_0 = Spade(args, channel_in, in_channel=in_channel)
-        self.conv_0 = nn.utils.spectral_norm(nn.Conv2d(channel_in, channel_middle, kernel_size=3, stride=1, bias=True))
+        self.conv_0 = Conv2D(channel_in, channel_middle, kernel_size=3, stride=1, bias=True, use_spectrual_norm=True)
 
         self.spade_1 = Spade(args, channel_middle, in_channel=in_channel)
-        self.conv_1 = nn.utils.spectral_norm(nn.Conv2d(channel_middle, channel_middle, kernel_size=3, stride=1, bias=True))
+        self.conv_1 = Conv2D(channel_middle, channel_middle, kernel_size=3, stride=1, bias=True, use_spectrual_norm=True)
 
         if self.channel_in != self.channel_out:
             self.shortcut_spade = Spade(args, channel_in, in_channel=in_channel)
-            self.shortcut_conv = nn.utils.spectral_norm(nn.Conv2d(channel_in, channel_out, kernel_size=1, stride=1, bias=False))
+            self.shortcut_conv = Conv2D(channel_in, channel_out, kernel_size=1, stride=1, bias=False, use_spectrual_norm=True)
 
     def forward(self, tensor, condition):
         x = F.leaky_relu(self.spade_0(tensor, condition), 0.2)

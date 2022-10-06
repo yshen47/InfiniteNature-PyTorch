@@ -17,7 +17,7 @@
 
 import math
 
-from interactive_demo import geometry
+from modules.tensorflow_api import geometry
 import tensorflow as tf
 
 
