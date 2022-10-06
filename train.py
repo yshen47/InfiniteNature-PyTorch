@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     data = instantiate_from_config(config.data)
 
-    config.model.params.data_config = config.data.params
+    # config.model.params.data_config = config.data.params
     model = instantiate_from_config(config.model)
     model.logdir = logdir
 

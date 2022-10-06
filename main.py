@@ -1,3 +1,4 @@
+import os.path
 import sys
 # Make sure python can find our libraries.
 sys.path.append('/home/yuan/PycharmProjects/infinite_nature/tf_mesh_renderer/mesh_renderer')
@@ -8,12 +9,15 @@ import torch
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from modules.tensorflow_api.render import render
+import os
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     config = OmegaConf.load("configs/google_earth.yaml")
     model = instantiate_from_config(config.model).eval().cuda()
-
+    # if not os.path.exists("infinite_nature_pytorch.ckpt"):
+    #     torch.save(model.state_dict(), "infinite_nature_pytorch.ckpt")
     # library.download_checkpoints_and_demo_assets()
     # initial_rgbds = library.load_assets()
 
@@ -51,14 +55,15 @@ if __name__ == '__main__':
             mask = torch.from_numpy(mask.numpy()).permute(0, 3, 1, 2).cuda()
             predicted_rgbd = model(rendered_rgbd, mask, z)
 
-            plt.imshow(rendered_rgbd[0].permute(1, 2, 0)[:, :, :3].cpu())
-            plt.show()
-            plt.imshow(rendered_rgbd[0].permute(1, 2, 0)[:, :, 3].cpu())
-            plt.show()
+            # plt.imshow(rendered_rgbd[0].permute(1, 2, 0)[:, :, :3].cpu())
+            # plt.show()
+            # plt.imshow(rendered_rgbd[0].permute(1, 2, 0)[:, :, 3].cpu())
+            # plt.show()
 
             plt.imshow(predicted_rgbd[0].permute(1, 2, 0)[:, :, :3].cpu())
             plt.show()
-            plt.imshow(predicted_rgbd[0].permute(1, 2, 0)[:, :, 3].cpu())
-            plt.show()
-            print()
+            # plt.imshow(predicted_rgbd[0].permute(1, 2, 0)[:, :, 3].cpu())
+            # plt.show()
+
+            state['rgbd'] = predicted_rgbd[0]
 

@@ -3,4 +3,4 @@ __pycache__
 ckpt
 *.pyc
 logs
-*.npy
+*.ckpt

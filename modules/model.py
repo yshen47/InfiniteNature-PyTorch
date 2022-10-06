@@ -21,7 +21,11 @@ class InfiniteNature(pl.LightningModule):
         self.perceptual_loss = LPIPS().eval()
         self.automatic_optimization = False
         if ckpt_path is None:
-            self.load_pretrained_weights_from_tensorflow_to_pytorch()
+            if os.path.exists("infinite_nature_pytorch.ckpt"):
+                self.load_state_dict(torch.load("infinite_nature_pytorch.ckpt"))
+            else:
+                self.load_pretrained_weights_from_tensorflow_to_pytorch()
+                torch.save(self.state_dict(), "infinite_nature_pytorch.ckpt")
         else:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
 
