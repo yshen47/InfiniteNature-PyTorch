@@ -56,17 +56,14 @@ class InfiniteNature(pl.LightningModule):
 
         for name, array in tf_vars:
             if not ('generator' in name or 'discriminator' in name):
-                print(f'Excluded weights: {name} {array.shape}')
+                # print(f'Excluded weights: {name} {array.shape}')
                 continue
 
             if 'Adam' in name:
-                print(f'Excluded weights: {name} {array.shape}')
+                # print(f'Excluded weights: {name} {array.shape}')
                 continue
 
             pointer = self
-            # if name.split('/')[-1] in ['u']:
-            #     print(f'Excluded weights: {name} {array.shape}')
-            #     continue
             if 'conv' in name:
                 name = name.split('/')
                 truncated_names = None
@@ -77,7 +74,7 @@ class InfiniteNature(pl.LightningModule):
                         if truncated_names[0] == 'conv2d':
                             truncated_names = name[i_m + 2:]
                         break
-                print(truncated_names)
+                # print(truncated_names)
                 if truncated_names[0] == 'kernel':
                     if len(pointer.shape) == 4:
                         # TODO: it might also be (3, 2, 0, 1), which needs double-checking

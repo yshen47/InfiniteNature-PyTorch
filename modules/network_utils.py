@@ -74,13 +74,11 @@ class Conv2D(nn.Module):
 
     @bias.setter
     def bias(self, new_value):
-        print('entered bias.setter')
         self._bias = new_value
         self.conv2d.bias.data = new_value
 
     @weight.setter
     def weight(self, new_value):
-        print('entered weight.setter')
         self.conv2d.weight.data = new_value
         if self.use_spectral_norm and not self.applied:
             self.apply_spectral_norm_to_kernel()

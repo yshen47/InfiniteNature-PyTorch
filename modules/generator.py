@@ -47,56 +47,42 @@ class SpadeGenerator(nn.Module):
         self.head = SpadeResBlock(args,
                                     channel_in=16*self.args.num_channel,
                                     channel_out=16*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.middle_0 = SpadeResBlock(args,
                                     channel_in=16*self.args.num_channel,
                                     channel_out=16*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.middle_1 = SpadeResBlock(args,
                                     channel_in=16*self.args.num_channel,
                                     channel_out=16*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.up_0 = SpadeResBlock(args,
                                     channel_in=16*self.args.num_channel,
                                     channel_out=8*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.up_1 = SpadeResBlock(args,
                                     channel_in=8*self.args.num_channel,
                                     channel_out=4*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.up_2 = SpadeResBlock(args,
                                     channel_in=4*self.args.num_channel,
                                     channel_out=2*self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
         self.up_3 = SpadeResBlock(args,
                                     channel_in=2*self.args.num_channel,
                                     channel_out=self.args.num_channel,
-                                    input_h=160,
-                                    input_w=256,
                                     use_spectral_norm=self.args.use_spectral_norm,
                                     in_channel=5)
 
@@ -233,7 +219,7 @@ class SpadeEncoder(nn.Module):
 # Modified based on infinite nature spade block
 class SpadeResBlock(nn.Module):
 
-    def __init__(self, args, channel_in, channel_out, input_h, input_w, use_spectral_norm=False, in_channel=5):
+    def __init__(self, args, channel_in, channel_out, use_spectral_norm=False, in_channel=5):
         super().__init__()
         self.args = args
         self.channel_in = channel_in
@@ -261,7 +247,7 @@ class SpadeResBlock(nn.Module):
         x = self.conv_1(x)
 
         if self.channel_in != self.channel_out:
-            x_in = F.leaky_relu(self.shortcut_spade(tensor, condition), 0.2)
+            x_in = self.shortcut_spade(tensor, condition)
             x_in = sn_conv_padding(x_in, stride=1, kernel_size=1)
             x_in = self.shortcut_conv(x_in)
         else:
