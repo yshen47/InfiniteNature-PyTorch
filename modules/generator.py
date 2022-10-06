@@ -115,7 +115,7 @@ class SpadeGenerator(nn.Module):
         img = torch.cat([img, mask], dim=1)
 
         batch_size, unused_c, im_height, im_width = rgbd.shape
-        x = self.linear(z).view(batch_size, 16*self.args.num_channel, self.init_h, self.init_w)
+        x = self.linear(z).view(batch_size, self.init_h, self.init_w, 16*self.args.num_channel).permute(0, 3, 1, 2)
 
         x = self.head(x, img)
         x = F.interpolate(x, scale_factor=2)
@@ -265,7 +265,7 @@ class SpadeResBlock(nn.Module):
             x_in = sn_conv_padding(x_in, stride=1, kernel_size=1)
             x_in = self.shortcut_conv(x_in)
         else:
-            x_in = x
+            x_in = tensor
         out = x + x_in
         return out
 
