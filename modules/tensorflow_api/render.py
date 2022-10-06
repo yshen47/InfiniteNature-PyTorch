@@ -15,9 +15,10 @@
 
 """Render library code for accessing tf_mesh_renderer.
 """
-from interactive_demo import geometry
+from modules import geometry
 import render_utils
 import tensorflow as tf
+import tensorflow_addons as tfa
 from tf_mesh_renderer.mesh_renderer import rasterize_triangles
 
 
