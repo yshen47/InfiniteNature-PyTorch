@@ -45,8 +45,9 @@ Feel free to modify the next pose to have more interesting trajectory. We manual
 ## Train on your own dataset
 For each dataset, we need to first prepare a config file and write a customized data loader. Make sure you follow our provided config and dataloader example for GoogleEarth-Infinite dataset. The training is wrapped in Pytorch-lightning framework
 
-For details about GoogleEarth-Infinite dataset, please check the paper [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
-
 ```angular2html 
     python train.py
 ```
+
+For details about GoogleEarth-Infinite dataset, please check the paper [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
+
