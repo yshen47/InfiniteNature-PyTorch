@@ -11,16 +11,16 @@ model:
       use_spectral_norm: False
       num_channel: 32
       num_hidden: 128
-      dataset: google_earth
+      dataset: clevr-infinite
     ignore_keys: [dense,]
 
 data:
   target: data.utils.utils.DataModuleFromConfig
   params:
     batch_size: 6
-    num_workers: 4
-    dataset: google_earth
+    num_workers: 0
+    dataset: clevr-infinite
     depth_range: [ 0.099975586, 4.765625 ]
-    dataset_dir: /media/yuan/T7_red/GoogleEarthDataset
+    dataset_dir: /media/yuan/T7_red/blender_3d_large
     use_depth: True
-    image_resolution: [512, 512]
+    image_resolution: [256, 256]

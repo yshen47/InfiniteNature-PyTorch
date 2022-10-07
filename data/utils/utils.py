@@ -1,5 +1,4 @@
 import collections
-import os
 import tarfile
 import urllib
 import zipfile
@@ -9,8 +8,7 @@ from data.utils.helper_types import Annotation
 from torch._six import string_classes
 from torch.utils.data._utils.collate import np_str_obj_array_pattern, default_collate_err_msg_format
 from tqdm import tqdm
-
-import argparse, os, importlib
+import argparse, importlib
 from omegaconf import OmegaConf
 import numpy as np
 from PIL import Image
@@ -215,6 +213,29 @@ class DataModuleFromConfig(pl.LightningDataModule):
                     'image_resolution': list(image_resolution)
                 }
             }
+        elif dataset == 'clevr-infinite':
+            train = {
+                "target": "data.blender_3d.Blender3dTrain",
+                "params": {
+                    'dataset_dir': dataset_dir,
+                    'image_resolution': list(image_resolution)
+                }
+            }
+            validation = {
+                "target": "data.blender_3d.Blender3dValidation",
+                "params": {
+                    'dataset_dir': dataset_dir,
+                    'image_resolution': list(image_resolution)
+                }
+            }
+
+            test = {
+                "target": "data.blender_3d.Blender3dTest",
+                "params": {
+                    'dataset_dir': dataset_dir,
+                    'image_resolution': list(image_resolution)
+                }
+            }
         else:
             raise NotImplementedError
 
@@ -224,9 +245,9 @@ class DataModuleFromConfig(pl.LightningDataModule):
         if validation is not None:
             self.dataset_configs["validation"] = validation
             self.val_dataloader = self._val_dataloader
-        if test is not None:
-            self.dataset_configs["test"] = test
-            self.test_dataloader = self._test_dataloader
+        # if test is not None:
+        #     self.dataset_configs["test"] = test
+        #     self.test_dataloader = self._test_dataloader
         self.wrap = wrap
 
     def prepare_data(self):

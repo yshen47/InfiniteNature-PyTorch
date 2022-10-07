@@ -11,26 +11,14 @@ import pickle
 import torch.nn.functional as F
 
 
-class PRNGMixin(object):
-    """Adds a prng property which is a numpy RandomState which gets
-    reinitialized whenever the pid changes to avoid synchronized sampling
-    behavior when used in conjunction with multiprocessing."""
 
-    @property
-    def prng(self, seed=None):
-        currentpid = os.getpid()
-        if getattr(self, "_initpid", None) != currentpid:
-            self._initpid = currentpid
-            self._prng = np.random.RandomState(seed=seed) if seed is not None else np.random.RandomState()
-        return self._prng
 
 
 class GoogleEarthBase(Dataset, PRNGMixin):
     def __init__(self, split, dataset_dir=None, dataset=None, image_resolution=None,
-                 depth_range=None, use_extrapolation_mask=None):
+                 depth_range=None):
         self.split = split
         self.src_num = 1
-        self.use_extrapolation_mask = use_extrapolation_mask
         self.depth_range = depth_range
         self.dataset = dataset
         self.image_resolution = image_resolution
@@ -175,7 +163,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         mask[:src_num] = 1
 
         example = {
-            "Ks": np.stack(Ks),
+            "Ks": Ks,
             "tgt_frame_id": np.array([tgt_frame_id]),
             "src_frame_id": np.array([src_frame_ids[0]]),
             "T_src2tgt": T_rels[0],
@@ -190,21 +178,21 @@ class GoogleEarthBase(Dataset, PRNGMixin):
 
 
 class GoogleEarthTrain(GoogleEarthBase):
-    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None):
         super().__init__(split='train', dataset=dataset, dataset_dir=dataset_dir,
-                         image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
+                         image_resolution=image_resolution, depth_range=depth_range)
         self.size = size
 
 
 class GoogleEarthValidation(GoogleEarthBase):
-    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None):
         super().__init__(split='val', dataset=dataset,  dataset_dir=dataset_dir,
-                         image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
+                         image_resolution=image_resolution, depth_range=depth_range)
         self.size = size
 
 
 class GoogleEarthTest(GoogleEarthBase):
-    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, use_extrapolation_mask=None):
+    def __init__(self, size=None, dataset_dir=None, dataset=None, image_resolution=None, depth_range=None, ):
         super().__init__(split='test',  dataset_dir=dataset_dir, dataset=dataset,
-                         image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
+                         image_resolution=image_resolution, depth_range=depth_range)
         self.size = size

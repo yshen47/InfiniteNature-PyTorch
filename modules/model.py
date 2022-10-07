@@ -23,14 +23,16 @@ class InfiniteNature(pl.LightningModule):
         self.spade_discriminator_1 = PatchDiscriminator()
         self.perceptual_loss = LPIPS().eval()
         self.automatic_optimization = False
-        if ckpt_path is None:
-            if os.path.exists("infinite_nature_pytorch.ckpt"):
-                self.init_from_ckpt("infinite_nature_pytorch.ckpt", ignore_keys=ignore_keys)
+
+        if ckpt_path is not None:
+            if "infinite_nature_pytorch.ckpt" in ckpt_path:
+                if os.path.exists("infinite_nature_pytorch.ckpt"):
+                    self.init_from_ckpt("infinite_nature_pytorch.ckpt", ignore_keys=ignore_keys)
+                else:
+                    self.load_pretrained_weights_from_tensorflow_to_pytorch()
+                    torch.save(self.state_dict(), "infinite_nature_pytorch.ckpt")
             else:
-                self.load_pretrained_weights_from_tensorflow_to_pytorch()
-                torch.save(self.state_dict(), "infinite_nature_pytorch.ckpt")
-        else:
-            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+                self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
 
     def configure_optimizers(self):
         lr = self.learning_rate
@@ -144,8 +146,8 @@ class InfiniteNature(pl.LightningModule):
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           1/x_src[:, 3][:, None],
-                                                          batch["Ks"][:, 0],
-                                                          batch["Ks"][:, 0],
+                                                          batch["Ks"],
+                                                          batch["Ks"],
                                                           batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, mask, z)
         loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train')
@@ -167,8 +169,8 @@ class InfiniteNature(pl.LightningModule):
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           1/x_src[:, 3][:, None],
-                                                          batch["Ks"][:, 0],
-                                                          batch["Ks"][:, 0],
+                                                          batch["Ks"],
+                                                          batch["Ks"],
                                                           batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
         loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'val')
@@ -324,8 +326,8 @@ class InfiniteNature(pl.LightningModule):
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
                                                                         1/x_src[:, 3][:, None],
-                                                                        batch["Ks"][:, 0],
-                                                                        batch["Ks"][:, 0],
+                                                                        batch["Ks"],
+                                                                        batch["Ks"],
                                                                         batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
         log = dict()
