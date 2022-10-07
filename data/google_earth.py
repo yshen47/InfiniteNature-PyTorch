@@ -11,7 +11,18 @@ import pickle
 import torch.nn.functional as F
 
 
+class PRNGMixin(object):
+    """Adds a prng property which is a numpy RandomState which gets
+    reinitialized whenever the pid changes to avoid synchronized sampling
+    behavior when used in conjunction with multiprocessing."""
 
+    @property
+    def prng(self, seed=None):
+        currentpid = os.getpid()
+        if getattr(self, "_initpid", None) != currentpid:
+            self._initpid = currentpid
+            self._prng = np.random.RandomState(seed=seed) if seed is not None else np.random.RandomState()
+        return self._prng
 
 
 class GoogleEarthBase(Dataset, PRNGMixin):
@@ -163,7 +174,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         mask[:src_num] = 1
 
         example = {
-            "Ks": Ks,
+            "Ks": Ks[0],
             "tgt_frame_id": np.array([tgt_frame_id]),
             "src_frame_id": np.array([src_frame_ids[0]]),
             "T_src2tgt": T_rels[0],
