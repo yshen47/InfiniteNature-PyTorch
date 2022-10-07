@@ -34,7 +34,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         self.depth_range = depth_range
         self.dataset = dataset
         self.image_resolution = image_resolution
-        self.dataset_dir = dataset_dir #"/shared/rsaas/yshen47/GoogleEarthDataset" #"/shared/rsaas/yshen47/blender_3d_large"
+        self.dataset_dir = dataset_dir
         if not os.path.exists(self.dataset_dir):
             self.dataset_dir = "/shared/rsaas/yshen47/GoogleEarthDataset"
 
@@ -44,28 +44,13 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         self.grids = []
         self.cumulative_sum = [0]
         self.K = np.load(f"{self.dataset_dir}/K.npy")
-        #with open(f"{self.sparse_dir}/{self.split}.txt") as f:
-        #    fully_visible_file_list = [l.strip().split("/")[-2:] for l in f.readlines()]
-        #fully_visible_file_map = {}
-        #for l in fully_visible_file_list:
-        #    #scene_name = l[0]
-        #    #image_name = l[1]
-        #    #if scene_name not in fully_visible_file_map:
-        #    #    fully_visible_file_map[scene_name] = []
-        #    #fully_visible_file_map[scene_name].append(image_name)
-
         for grid_transform_path in sorted(Path(self.dataset_dir, self.split).glob("*")):
             if 'chicago' in str(grid_transform_path):
                 continue
-            scene_name = grid_transform_path.name
             print(grid_transform_path)
             with open(str(grid_transform_path / "transforms.json"), 'r') as f:
                 curr_transform = json.load(f)
-                #if os.path.exists(str(grid_transform_path / "networkx.gml")):
-                    #g = nx.read_gml(str(grid_transform_path / "networkx.gml"))
-                #else:
-                g = self.build_graph_from_transform(curr_transform['frames'], grid_transform_path)#, fully_visible_file_map[scene_name])
-                #    nx.write_gml(g, str(grid_transform_path / "networkx.gml"))
+                g = self.build_graph_from_transform(curr_transform['frames'], grid_transform_path)
                 self.grids.append(g)
                 self.cumulative_sum.append(len(g.nodes) + self.cumulative_sum[-1])
 
@@ -80,8 +65,6 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             if not transform['is_valid']:
                 continue
             frame_id = int(transform['file_path'][-9:-4])
-            #if self.use_fully_visible and f"im_{frame_id:05d}.png" not in fully_visible_list:
-            #    continue
             g.add_nodes_from([(frame_id,
                                {
                                     "frame_id": frame_id,
@@ -91,7 +74,6 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                                     "rgb_path": str(grid_transform_path / f"im_{frame_id:05d}.png"),
                                     "depth_path": str(grid_transform_path / f"dm_{frame_id:05d}.npy"),
                                     })])
-            #print(str(grid_transform_path / f"im_{frame_id:05d}.png"))
             if len(g) == 900 and self.split != 'train':  #TODO: overfit
                 break
         # print(len(g))
@@ -187,7 +169,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             img_dst = np.array(img_dst) / 127.5 - 1.0
             img_srcs = [np.array(img_src) / 127.5 - 1.0 for img_src in img_srcs]
             for i in range(len(dm_srcs)):
-                dm_srcs[i][dm_srcs[i] == 65504] = -99999
+                dm_srcs[i][dm_srcs[i] == 65504] = -99999 # those pixels will be excluded out
 
         mask = np.zeros(self.src_num)
         mask[:src_num] = 1
@@ -204,8 +186,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             "T_src2tgt": T_rels[0],
             "dst_img": img_dst,
             "src_img": img_srcs[0],
-            "dst_depth": dm_dst[..., None],
-            "src_depth": dm_srcs[0][..., None],
+            "dst_disparity": 1/dm_dst[..., None],
+            "src_disparity": 1/dm_srcs[0][..., None],
         }
         for k in example:
             example[k] = example[k].astype(np.float32)
@@ -231,4 +213,3 @@ class GoogleEarthTest(GoogleEarthBase):
         super().__init__(split='test',  dataset_dir=dataset_dir, dataset=dataset,
                          image_resolution=image_resolution, depth_range=depth_range, use_extrapolation_mask=use_extrapolation_mask)
         self.size = size
-

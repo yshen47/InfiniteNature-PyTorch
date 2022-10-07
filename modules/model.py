@@ -25,8 +25,7 @@ class InfiniteNature(pl.LightningModule):
         self.automatic_optimization = False
         if ckpt_path is None:
             if os.path.exists("infinite_nature_pytorch.ckpt"):
-                # self.load_state_dict(torch.load("infinite_nature_pytorch.ckpt"), strict=False)
-                self.init_from_ckpt("infinite_nature_pytorch.ckpt", ignore_keys=['linear'])
+                self.init_from_ckpt("infinite_nature_pytorch.ckpt", ignore_keys=ignore_keys)
             else:
                 self.load_pretrained_weights_from_tensorflow_to_pytorch()
                 torch.save(self.state_dict(), "infinite_nature_pytorch.ckpt")
@@ -137,13 +136,11 @@ class InfiniteNature(pl.LightningModule):
                 else:
                     pointer = torch.from_numpy(array)
 
-                print()
-
     def training_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
-                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+                           batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+                           batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           x_src[:, 3][:, None],
@@ -167,9 +164,9 @@ class InfiniteNature(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
-                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+                           batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+                           batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
 
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
@@ -276,8 +273,9 @@ class InfiniteNature(pl.LightningModule):
 
     def forward(self, rendered_rgbd, mask, encoding):
         predicted_rgbd = self.generator(rendered_rgbd, mask, encoding)
-        refined_disparity = self.rescale_refined_disparity(rendered_rgbd[:, 3:], mask, predicted_rgbd[:, 3:])
-        predicted_rgbd = torch.cat([predicted_rgbd[:, :3], refined_disparity], axis=1)
+        if not self.training:
+            refined_disparity = self.rescale_refined_disparity(rendered_rgbd[:, 3:], mask, predicted_rgbd[:, 3:])
+            predicted_rgbd = torch.cat([predicted_rgbd[:, :3], refined_disparity], axis=1)
         return predicted_rgbd
 
     def discriminate(self, rgbd, use_for_discriminator_loss=False):
@@ -323,9 +321,9 @@ class InfiniteNature(pl.LightningModule):
 
     def log_images(self, batch, **kwargs):
         x_src = torch.cat([batch['src_img'],
-                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+                           batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                                 batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+                                 batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
 
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
@@ -335,12 +333,10 @@ class InfiniteNature(pl.LightningModule):
                                                                         batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
         log = dict()
-        input_disparity = x_src[:, 3:]
-        input_rgb = x_src[:, :3]
-        log["warped_input"] = input_rgb
-        log["warped_disparity"] = 1/input_disparity
+        log["warped_input"] = rendered_rgbd
+        log["warped_disparity"] = 1/(rendered_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
         log["reconstructions"] = predicted_rgbd[:, :3]
-        log["reconstruction_disparities"] = 1/predicted_rgbd[:, 3:]
+        log["reconstruction_disparity"] = 1/(predicted_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
         log["gt_rgb"] = gt_tgt_rgbd[:, :3]
-        log["gt_disparity"] = 1/gt_tgt_rgbd[:, 3:]
+        log["gt_disparity"] = 1/(gt_tgt_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
         return log

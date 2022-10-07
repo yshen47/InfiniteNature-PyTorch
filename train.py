@@ -82,27 +82,13 @@ if __name__ == '__main__':
     trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
     trainer_kwargs["callbacks"].append(CheckpointEveryNSteps(2500, os.path.join(logdir, "checkpoints", "last.ckpt")))
     trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
-    
-    # trainer = Trainer(gpus=0 if -1 in gpu_ids else len(gpu_ids),
-    #                   strategy='ddp',
-    #                   logger=wandb_logger,
-    #                   devices=gpu_ids,
-    #                   accelerator='gpu' if len(gpu_ids) > 0 else 'cpu'
-    #                   )
-    trainer.num_sanity_val_steps = 2
-    # def melk(*args, **kwargs):
-    #     # run all checkpoint hooks
-    #     if trainer.global_rank == 0:
-    #         print("Summoning checkpoint.")
-    #         ckpt_path = os.path.join(ckpt_dir, "last.ckpt")
-    #         trainer.save_checkpoint(ckpt_path)
 
+    trainer.num_sanity_val_steps = 2
     def divein(*args, **kwargs):
         if trainer.global_rank == 0:
             import pudb
             pudb.set_trace()
 
-    # signal.signal(signal.SIGUSR1, melk)
     signal.signal(signal.SIGUSR2, divein)
 
     trainer.fit(model, data)

@@ -41,8 +41,11 @@ class SpadeGenerator(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.init_h = 16
-        self.init_w = 16
+        self.init_h = 5
+        self.init_w = 8
+        if args.dataset == 'google_earth':
+            self.init_h = 16
+            self.init_w = 16
         self.linear = Dense(self.args.embedding_size, 16 * self.args.num_channel * self.init_h * self.init_w)
         self.head = SpadeResBlock(args,
                                   channel_in=16 * self.args.num_channel,
@@ -154,8 +157,11 @@ class SpadeEncoder(nn.Module):
         self.conv_5 = Conv2D(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True,
                              use_spectrual_norm=True)
         self.inst_norm_5 = torch.nn.InstanceNorm2d(8 * num_channel)
-        self.linear_mu = Dense(8192, self.args.embedding_size)
-        self.linear_logvar = Dense(8192, self.args.embedding_size)
+        input_dense_dim = 1536
+        if args.dataset == 'google_earth':
+            input_dense_dim = 8192
+        self.linear_mu = Dense(input_dense_dim, self.args.embedding_size)
+        self.linear_logvar = Dense(input_dense_dim, self.args.embedding_size)
 
     def forward(self, x, return_intermediate=False):
         """Encoder that outputs global N(mu, sig) parameters.

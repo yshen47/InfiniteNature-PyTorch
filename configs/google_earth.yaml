@@ -10,6 +10,8 @@ model:
       use_spectral_norm: False
       num_channel: 32
       num_hidden: 128
+      dataset: google_earth
+    ignore_keys: linear,
 
 data:
   target: data.utils.utils.DataModuleFromConfig

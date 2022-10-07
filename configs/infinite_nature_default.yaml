@@ -1,0 +1,13 @@
+log_keywords: None
+model:
+  target: modules.model.InfiniteNature
+  seed: 0
+  gpu_ids: 0,   # -1 for cpu, make sure there is comma follows each number
+  params:
+    learning_rate: 2e-4
+    generator_config:
+      embedding_size: 256
+      use_spectral_norm: False
+      num_channel: 32
+      num_hidden: 128
+      dataset: infinite_nature_default
