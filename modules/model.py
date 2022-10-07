@@ -1,12 +1,14 @@
 from modules.generator import Generator
 from modules.discriminator import PatchDiscriminator
-import torch
 import pytorch_lightning as pl
 from modules.warp import render_projection_from_srcs_fast
 from modules.lpips import LPIPS
-import os
+import torch.nn.functional as F
 from modules.loss import *
 from modules.network_utils import Conv2D
+import PIL
+from modules.metrics import *
+import os
 
 
 class InfiniteNature(pl.LightningModule):
@@ -16,13 +18,15 @@ class InfiniteNature(pl.LightningModule):
         self.generator_config = generator_config
         self.learning_rate = learning_rate
         self.generator = Generator(generator_config)
+        self.perceptual_loss = LPIPS().eval()
         self.spade_discriminator_0 = PatchDiscriminator()
         self.spade_discriminator_1 = PatchDiscriminator()
         self.perceptual_loss = LPIPS().eval()
         self.automatic_optimization = False
         if ckpt_path is None:
             if os.path.exists("infinite_nature_pytorch.ckpt"):
-                self.load_state_dict(torch.load("infinite_nature_pytorch.ckpt"))
+                # self.load_state_dict(torch.load("infinite_nature_pytorch.ckpt"), strict=False)
+                self.init_from_ckpt("infinite_nature_pytorch.ckpt", ignore_keys=['linear'])
             else:
                 self.load_pretrained_weights_from_tensorflow_to_pytorch()
                 torch.save(self.state_dict(), "infinite_nature_pytorch.ckpt")
@@ -39,12 +43,13 @@ class InfiniteNature(pl.LightningModule):
         return opt_g, opt_disc
 
     def init_from_ckpt(self, path, ignore_keys=('loss')):
-        sd = torch.load(path, map_location="cpu")["state_dict"]
+        sd = torch.load(path, map_location="cpu")
+        if "state_dict" in sd:
+            sd = sd['state_dict']
         keys = list(sd.keys())
         for k in keys:
             for ik in ignore_keys:
-                #print(ik, k)
-                if k.startswith(ik):
+                if ik in k:
                     # print("Deleting key {} from state_dict.".format(k))
                     del sd[k]
         self.load_state_dict(sd, strict=False)
@@ -149,15 +154,15 @@ class InfiniteNature(pl.LightningModule):
         # disc_on_generated = self.discriminate(predicted_rgbd)
         # generated_features = [f[0] for f in disc_on_generated]
         # generated_logits = [f[1] for f in disc_on_generated]
-        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss)
-        self.log_dict(loss_dict)
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train')
+        self.log_dict(loss_dict, sync_dist=True, on_step=True, on_epoch=True, rank_zero_only=True)
 
         opt_ae, opt_disc = self.optimizers()
         opt_ae.zero_grad()
-        loss_dict['total_generator_loss'].backward()
+        loss_dict['train/total_generator_loss'].backward()
         opt_ae.step()
         opt_disc.zero_grad()
-        loss_dict['total_discriminator_loss'].backward()
+        loss_dict['train/total_discriminator_loss'].backward()
         opt_disc.step()
 
     def validation_step(self, batch, batch_idx):
@@ -167,13 +172,96 @@ class InfiniteNature(pl.LightningModule):
                            batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
 
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
-        rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
+        rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           x_src[:, 3][:, None],
                                                           batch["Ks"][:, 0],
                                                           batch["Ks"][:, 0],
                                                           batch['T_src2tgt'])
-        predicted_rgbd = self(rendered_rgbd, mask, z)
-        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss)
+        predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'val')
+        self.log_dict(loss_dict, on_epoch=True, on_step=True, sync_dist=True)
+
+        ssim = SSIM()
+        psnr = PSNR()
+        ssim_score = 0
+        psnr_score = 0
+        ssim_visible_score = 0
+        psnr_visible_score = 0
+
+        os.makedirs(os.path.join(self.logdir, f'qualitative_res/pred'), exist_ok=True)
+        os.makedirs(os.path.join(self.logdir, f'qualitative_res/warped_inputs'), exist_ok=True)
+
+        os.makedirs(os.path.join(self.logdir, f'qualitative_res/gt'), exist_ok=True)
+        os.makedirs(os.path.join(self.logdir, f'qualitative_res/extrapolation_mask'), exist_ok=True)
+        p_loss = self.perceptual_loss(gt_tgt_rgbd[:, :3].contiguous().float(),
+                                      predicted_rgbd[:, :3].contiguous().float())
+        rendered_rgbd[:, :3] = torch.clip((rendered_rgbd[:, :3] + 1) / 2, 0, 1)
+        predicted_rgbd[:, :3] = torch.clip((predicted_rgbd[:, :3] + 1) / 2, 0, 1)
+        gt_tgt_rgbd[:, :3] = torch.clip((gt_tgt_rgbd[:, :3] + 1) / 2, 0, 1)
+
+        for i in range(gt_tgt_rgbd.shape[0]):
+            warped = torch.clip(rendered_rgbd[i, :3] * 255, 0, 255).permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8).astype(
+                np.float32)
+
+            pred = torch.clip(predicted_rgbd[i, :3] * 255, 0, 255).permute(1, 2, 0).detach().cpu().numpy().astype(
+                np.uint8).astype(np.float32)
+            gt = torch.clip(gt_tgt_rgbd[i, :3] * 255, 0, 255).permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8).astype(
+                np.float32)
+
+            res = ssim(pred, gt, (1-extrapolation_mask[i]).permute(1, 2, 0).repeat(1, 1, 3)
+                       .detach().cpu().numpy() if extrapolation_mask is not None else None)
+            if extrapolation_mask is None:
+                curr_ssim = res
+            else:
+                curr_ssim, curr_visible_ssim = res
+                ssim_visible_score += curr_visible_ssim
+
+            res = psnr(pred, gt, (1-extrapolation_mask[i]).permute(1, 2, 0).repeat(1, 1, 3)
+                       .detach().cpu().numpy() if extrapolation_mask is not None else None)
+            if extrapolation_mask is None:
+                curr_psnr = res
+            else:
+                curr_psnr, curr_visilble_psnr = res
+                psnr_visible_score += curr_visilble_psnr
+
+            ssim_score += curr_ssim
+            psnr_score += curr_psnr
+
+            if extrapolation_mask is not None:
+                np.save(
+                    os.path.join(self.logdir, f'qualitative_res/extrapolation_mask/batch_{batch_idx}_index_{i}.png'),
+                    (1-extrapolation_mask[i]).permute(1, 2, 0).repeat(1, 1, 3).detach().cpu().numpy())
+                PIL.Image.fromarray(warped.astype(np.uint8)).save(
+                    os.path.join(self.logdir, f'qualitative_res/warped_inputs/batch_{batch_idx}_index_{i}.png'))
+            PIL.Image.fromarray(pred.astype(np.uint8)).save(
+                os.path.join(self.logdir, f'qualitative_res/pred/batch_{batch_idx}_index_{i}.png'))
+
+            PIL.Image.fromarray(gt.astype(np.uint8)).save(
+                os.path.join(self.logdir, f'qualitative_res/gt/batch_{batch_idx}_index_{i}.png'))
+        ssim_score /= gt_tgt_rgbd.shape[0]
+        psnr_score /= gt_tgt_rgbd.shape[0]
+        ssim_visible_score /= gt_tgt_rgbd.shape[0]
+        psnr_visible_score /= gt_tgt_rgbd.shape[0]
+
+
+        rgb_l1 = F.l1_loss(predicted_rgbd[:, :3], gt_tgt_rgbd[:, :3])
+        disparity_l1 = F.l1_loss(predicted_rgbd[:, 3:], gt_tgt_rgbd[:, 3:])
+
+        self.log("val/rgb_l1", rgb_l1,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("val/disparity_l1", disparity_l1,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("val/ssim", ssim_score,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("val/psnr", psnr_score,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("val/visible_ssim", ssim_visible_score,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("val/visible_psnr", psnr_visible_score,
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+
+        self.log("val/LPIPS", p_loss.mean().item(),
+                 prog_bar=True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
 
     def render_with_projection(self, x_src, dm_src, K_src, K_next, T_src2tgt):
         warped_depth, warped_features, extrapolation_mask = render_projection_from_srcs_fast(
@@ -232,3 +320,27 @@ class InfiniteNature(pl.LightningModule):
         scaled_refined_disparity = torch.clip(scale * refined_disparity,
                                                     0, 1)
         return scaled_refined_disparity
+
+    def log_images(self, batch, **kwargs):
+        x_src = torch.cat([batch['src_img'],
+                           batch['src_depth']], dim=-1).permute(0, 3, 1, 2)
+        gt_tgt_rgbd = torch.cat([batch['dst_img'],
+                                 batch['dst_depth']], dim=-1).permute(0, 3, 1, 2)
+
+        z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
+        rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
+                                                                        x_src[:, 3][:, None],
+                                                                        batch["Ks"][:, 0],
+                                                                        batch["Ks"][:, 0],
+                                                                        batch['T_src2tgt'])
+        predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
+        log = dict()
+        input_disparity = x_src[:, 3:]
+        input_rgb = x_src[:, :3]
+        log["warped_input"] = input_rgb
+        log["warped_disparity"] = 1/input_disparity
+        log["reconstructions"] = predicted_rgbd[:, :3]
+        log["reconstruction_disparities"] = 1/predicted_rgbd[:, 3:]
+        log["gt_rgb"] = gt_tgt_rgbd[:, :3]
+        log["gt_disparity"] = 1/gt_tgt_rgbd[:, 3:]
+        return log

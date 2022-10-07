@@ -1,11 +1,9 @@
-import copy
 import json
 import os
 from tqdm import tqdm
 import numpy as np
 from torch.utils.data import Dataset
 from pathlib import Path
-# from geofree.data.realestate import PRNGMixin, load_sparse_model_example, pad_pointsf
 import torch
 import networkx as nx
 from PIL import Image
@@ -185,6 +183,11 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                 dm_srcs[i][dm_srcs[i] == 65504] = -99999
             dm_dst = F.interpolate(torch.from_numpy(dm_dst[None, None,]), size=self.image_resolution)[0][
                 0].numpy()
+        else:
+            img_dst = np.array(img_dst) / 127.5 - 1.0
+            img_srcs = [np.array(img_src) / 127.5 - 1.0 for img_src in img_srcs]
+            for i in range(len(dm_srcs)):
+                dm_srcs[i][dm_srcs[i] == 65504] = -99999
 
         mask = np.zeros(self.src_num)
         mask[:src_num] = 1

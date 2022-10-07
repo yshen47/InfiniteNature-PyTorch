@@ -19,6 +19,20 @@ if __name__ == '__main__':
     sys.path.append(os.getcwd())
     config = OmegaConf.load(args.config_path)
 
+    # add callback which sets up log directory
+    default_callbacks_cfg = {
+        "image_logger": {
+            "target": "data.utils.utils.ImageLogger",
+            "params": {
+                "batch_frequency": 750,
+                "max_images": 4,
+                "clamp": True
+            }
+        },
+    }
+    callbacks_cfg = OmegaConf.create()
+    callbacks_cfg = OmegaConf.merge(default_callbacks_cfg, callbacks_cfg)
+
     # prepare log name
     log_name = args.experiment_name_suffix
     if config.log_keywords is not None:
@@ -57,13 +71,25 @@ if __name__ == '__main__':
         if gpu_id != '':
             gpu_ids.append(int(gpu_id))
 
-    trainer = Trainer(gpus=0 if -1 in gpu_ids else len(gpu_ids),
-                      strategy='ddp',
-                      logger=wandb_logger,
-                      devices=gpu_ids,
-                      accelerator='gpu' if len(gpu_ids) > 0 else 'cpu'
-                      )
-
+    trainer_kwargs = dict()
+    trainer_opt = argparse.Namespace(**{
+        "gpus": 0 if -1 in gpu_ids else len(gpu_ids),
+        "strategy": "ddp",
+        "logger": wandb_logger,
+        "devices": gpu_ids,
+        "accelerator": 'gpu' if len(gpu_ids) > 0 else 'cpu'
+    })
+    trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
+    trainer_kwargs["callbacks"].append(CheckpointEveryNSteps(2500, os.path.join(logdir, "checkpoints", "last.ckpt")))
+    trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
+    
+    # trainer = Trainer(gpus=0 if -1 in gpu_ids else len(gpu_ids),
+    #                   strategy='ddp',
+    #                   logger=wandb_logger,
+    #                   devices=gpu_ids,
+    #                   accelerator='gpu' if len(gpu_ids) > 0 else 'cpu'
+    #                   )
+    trainer.num_sanity_val_steps = 2
     # def melk(*args, **kwargs):
     #     # run all checkpoint hooks
     #     if trainer.global_rank == 0:

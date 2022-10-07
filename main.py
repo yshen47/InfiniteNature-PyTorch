@@ -9,7 +9,6 @@ import torch
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from modules.tensorflow_api.render import render
-import os
 
 
 # Press the green button in the gutter to run the script.
