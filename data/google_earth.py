@@ -105,7 +105,6 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                 return img_index, list(sorted(self.grids[img_index].nodes))[relative_idx]
 
     def __getitem__(self, global_index):
-        global_index = 0
         grid_id, idx = self.parse_idx(global_index)
         tgt_node = self.grids[grid_id].nodes[idx]
         tgt_neighbors = sorted(self.grids[grid_id][idx])
@@ -174,11 +173,6 @@ class GoogleEarthBase(Dataset, PRNGMixin):
 
         mask = np.zeros(self.src_num)
         mask[:src_num] = 1
-        while len(K_invs) < self.src_num:
-            Ks.append(np.eye(3))
-            img_srcs.append(np.zeros_like(img_srcs[-1]))
-            dm_srcs.append(np.zeros_like(dm_srcs[-1]))
-            src_frame_ids.append(-1)
 
         example = {
             "Ks": np.stack(Ks),

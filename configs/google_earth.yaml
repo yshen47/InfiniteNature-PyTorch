@@ -17,7 +17,7 @@ data:
   target: data.utils.utils.DataModuleFromConfig
   params:
     batch_size: 4
-    num_workers: 0
+    num_workers: 4
     dataset: google_earth
     depth_range: [ 0.099975586, 4.765625 ]
     dataset_dir: /media/yuan/T7_red/GoogleEarthDataset
