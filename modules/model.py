@@ -150,7 +150,6 @@ class InfiniteNature(pl.LightningModule):
         predicted_rgbd = self(rendered_rgbd, mask, z)
         loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train')
         self.log_dict(loss_dict, sync_dist=True, on_step=True, on_epoch=True, rank_zero_only=True)
-        #
         opt_ae, opt_disc = self.optimizers()
         opt_ae.zero_grad()
         loss_dict['train/total_generator_loss'].backward()
