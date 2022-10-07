@@ -143,7 +143,7 @@ class InfiniteNature(pl.LightningModule):
                            1/batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                          x_src[:, 3][:, None],
+                                                          1/x_src[:, 3][:, None],
                                                           batch["Ks"][:, 0],
                                                           batch["Ks"][:, 0],
                                                           batch['T_src2tgt'])
@@ -170,7 +170,7 @@ class InfiniteNature(pl.LightningModule):
 
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                          x_src[:, 3][:, None],
+                                                          1/x_src[:, 3][:, None],
                                                           batch["Ks"][:, 0],
                                                           batch["Ks"][:, 0],
                                                           batch['T_src2tgt'])
@@ -327,16 +327,19 @@ class InfiniteNature(pl.LightningModule):
 
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                                        x_src[:, 3][:, None],
+                                                                        1/x_src[:, 3][:, None],
                                                                         batch["Ks"][:, 0],
                                                                         batch["Ks"][:, 0],
                                                                         batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
         log = dict()
-        log["warped_input"] = rendered_rgbd
+        log["warped_input"] = rendered_rgbd[:, :3]
         log["warped_disparity"] = rendered_rgbd[:, 3:]
         log["reconstructions"] = predicted_rgbd[:, :3]
         log["reconstruction_disparity"] = predicted_rgbd[:, 3:]
         log["gt_rgb"] = gt_tgt_rgbd[:, :3]
         log["gt_disparity"] = gt_tgt_rgbd[:, 3:]
+
+        log["src_rgb"] = x_src[:, :3]
+        log["src_disparity"] = x_src[:, 3:]
         return log
