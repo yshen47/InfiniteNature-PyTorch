@@ -24,7 +24,7 @@ if __name__ == '__main__':
         "image_logger": {
             "target": "data.utils.utils.ImageLogger",
             "params": {
-                "batch_frequency": 750,
+                "batch_frequency": 500,
                 "max_images": 4,
                 "clamp": True
             }

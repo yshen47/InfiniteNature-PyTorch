@@ -49,7 +49,7 @@ class InfiniteNature(pl.LightningModule):
         for k in keys:
             for ik in ignore_keys:
                 if ik in k:
-                    # print("Deleting key {} from state_dict.".format(k))
+                    print("Deleting key {} from state_dict.".format(k))
                     del sd[k]
         self.load_state_dict(sd, strict=False)
         print(f"Restored from {path}")
@@ -138,9 +138,9 @@ class InfiniteNature(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
-                           batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
+                           1/batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
+                           1/batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           x_src[:, 3][:, None],
@@ -268,7 +268,7 @@ class InfiniteNature(pl.LightningModule):
             K_src.to(self.device),
             T_src2tgt,
             src_num=x_src.shape[1])
-        warped_rgbd = torch.cat([warped_features, warped_depth], dim=1)
+        warped_rgbd = torch.cat([warped_features, 1/torch.clip(warped_depth, 1e-7) * (1-extrapolation_mask)], dim=1)
         return warped_rgbd, 1-extrapolation_mask
 
     def forward(self, rendered_rgbd, mask, encoding):
@@ -334,9 +334,9 @@ class InfiniteNature(pl.LightningModule):
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
         log = dict()
         log["warped_input"] = rendered_rgbd
-        log["warped_disparity"] = 1/(rendered_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
+        log["warped_disparity"] = rendered_rgbd[:, 3:]
         log["reconstructions"] = predicted_rgbd[:, :3]
-        log["reconstruction_disparity"] = 1/(predicted_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
+        log["reconstruction_disparity"] = predicted_rgbd[:, 3:]
         log["gt_rgb"] = gt_tgt_rgbd[:, :3]
-        log["gt_disparity"] = 1/(gt_tgt_rgbd[:, 3:] + 10) / (1/10.099975586 - 1/14.765625)
+        log["gt_disparity"] = gt_tgt_rgbd[:, 3:]
         return log

@@ -11,7 +11,7 @@ model:
       num_channel: 32
       num_hidden: 128
       dataset: google_earth
-    ignore_keys: linear,
+    ignore_keys: [dense,]
 
 data:
   target: data.utils.utils.DataModuleFromConfig

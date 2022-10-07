@@ -156,8 +156,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                 img_srcs[i] = img_srcs[i].resize((self.image_resolution[1], self.image_resolution[0]), resample=Image.LANCZOS)
             img_dst = img_dst.resize((self.image_resolution[1], self.image_resolution[0]), resample=Image.LANCZOS)
 
-            img_dst = np.array(img_dst) / 127.5 - 1.0
-            img_srcs = [np.array(img_src) / 127.5 - 1.0 for img_src in img_srcs]
+            img_dst = np.array(img_dst) / 255.
+            img_srcs = [np.array(img_src) / 255. for img_src in img_srcs]
 
             ## depth
             for i in range(len(dm_srcs)):
@@ -166,8 +166,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             dm_dst = F.interpolate(torch.from_numpy(dm_dst[None, None,]), size=self.image_resolution)[0][
                 0].numpy()
         else:
-            img_dst = np.array(img_dst) / 127.5 - 1.0
-            img_srcs = [np.array(img_src) / 127.5 - 1.0 for img_src in img_srcs]
+            img_dst = np.array(img_dst) / 255.
+            img_srcs = [np.array(img_src) / 255. for img_src in img_srcs]
             for i in range(len(dm_srcs)):
                 dm_srcs[i][dm_srcs[i] == 65504] = -99999 # those pixels will be excluded out
 
