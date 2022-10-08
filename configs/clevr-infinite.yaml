@@ -1,11 +1,11 @@
-log_keywords: None
+log_keywords: model.params.learning_rate
 model:
   target: modules.model.InfiniteNature
   seed: 0
   gpu_ids: 0,   # -1 for cpu, make sure there is comma follows each number
   params:
 #    ckpt_path: None
-    learning_rate: 2e-4
+    learning_rate: 1e-3
     generator_config:
       embedding_size: 256
       use_spectral_norm: False
@@ -17,8 +17,8 @@ model:
 data:
   target: data.utils.utils.DataModuleFromConfig
   params:
-    batch_size: 6
-    num_workers: 0
+    batch_size: 8
+    num_workers: 8
     dataset: clevr-infinite
     depth_range: [ 7, 16 ]
     dataset_dir: /media/yuan/T7_red/blender_3d_large
