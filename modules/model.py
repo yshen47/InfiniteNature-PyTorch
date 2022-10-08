@@ -190,9 +190,9 @@ class InfiniteNature(pl.LightningModule):
         os.makedirs(os.path.join(self.logdir, f'qualitative_res/extrapolation_mask'), exist_ok=True)
         p_loss = self.perceptual_loss(gt_tgt_rgbd[:, :3].contiguous().float(),
                                       predicted_rgbd[:, :3].contiguous().float())
-        rendered_rgbd[:, :3] = torch.clip((rendered_rgbd[:, :3] + 1) / 2, 0, 1)
-        predicted_rgbd[:, :3] = torch.clip((predicted_rgbd[:, :3] + 1) / 2, 0, 1)
-        gt_tgt_rgbd[:, :3] = torch.clip((gt_tgt_rgbd[:, :3] + 1) / 2, 0, 1)
+        rendered_rgbd[:, :3] = torch.clip(rendered_rgbd[:, :3], 0, 1)
+        predicted_rgbd[:, :3] = torch.clip(predicted_rgbd[:, :3], 0, 1)
+        gt_tgt_rgbd[:, :3] = torch.clip(gt_tgt_rgbd[:, :3], 0, 1)
 
         for i in range(gt_tgt_rgbd.shape[0]):
             warped = torch.clip(rendered_rgbd[i, :3] * 255, 0, 255).permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8).astype(

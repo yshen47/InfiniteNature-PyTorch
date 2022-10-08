@@ -75,7 +75,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                                     })])
             if len(g) == 900 and self.split != 'train':  #TODO: overfit
                 break
-        # print(len(g))
+
         node_keys = sorted(g.nodes)
         for i in tqdm(range(len(g))):
             for j in range(i+1, len(g)):
