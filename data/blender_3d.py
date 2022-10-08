@@ -77,7 +77,6 @@ class Blender3dBase(Dataset, PRNGMixin):
                 return img_index, idx - cur_cumsum
 
     def __getitem__(self, global_index):
-        global_index = 0
         grid_id, idx = self.parse_idx(global_index)
         tgt_node = self.grids[grid_id].nodes[idx]
         tgt_neighbors = sorted(self.grids[grid_id][idx])
