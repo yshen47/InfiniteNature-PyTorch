@@ -20,7 +20,7 @@ data:
     batch_size: 6
     num_workers: 0
     dataset: clevr-infinite
-    depth_range: [ 0.099975586, 4.765625 ]
+    depth_range: [ 7, 16 ]
     dataset_dir: /media/yuan/T7_red/blender_3d_large
     use_depth: True
     image_resolution: [256, 256]

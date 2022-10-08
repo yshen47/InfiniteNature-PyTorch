@@ -16,6 +16,7 @@ class InfiniteNature(pl.LightningModule):
     def __init__(self, generator_config, learning_rate, ckpt_path=None, ignore_keys=()):
         super().__init__()
         self.generator_config = generator_config
+        self.dataset = self.generator_config.dataset
         self.learning_rate = learning_rate
         self.generator = Generator(generator_config)
         self.perceptual_loss = LPIPS().eval()
@@ -141,8 +142,13 @@ class InfiniteNature(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
                            1/batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
+        if self.dataset == 'clevr-infinite':
+            gt_tgt_disparity_scaled = (batch['dst_disparity']) / (1/7 - 1/16)
+        elif self.dataset == 'google_earth':
+            gt_tgt_disparity_scaled = 1/(1/batch['dst_disparity'] + 10) / (1/10.099975586 - 1/14.765625)
+
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           1/batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
+                           gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           1/x_src[:, 3][:, None],
@@ -163,9 +169,14 @@ class InfiniteNature(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x_src = torch.cat([batch['src_img'],
                            batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
-        gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
 
+        if self.dataset == 'clevr-infinite':
+            gt_tgt_disparity_scaled = (batch['dst_disparity']) / (1/7 - 1/16)
+        elif self.dataset == 'google_earth':
+            gt_tgt_disparity_scaled = 1/(1/batch['dst_disparity'] + 10) / (1/10.099975586 - 1/14.765625)
+
+        gt_tgt_rgbd = torch.cat([batch['dst_img'],
+                           gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           1/x_src[:, 3][:, None],
@@ -320,9 +331,12 @@ class InfiniteNature(pl.LightningModule):
     def log_images(self, batch, **kwargs):
         x_src = torch.cat([batch['src_img'],
                            batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
+        if self.dataset == 'clevr-infinite':
+            gt_tgt_disparity_scaled = (batch['dst_disparity']) / (1/7 - 1/16)
+        elif self.dataset == 'google_earth':
+            gt_tgt_disparity_scaled = 1/(1/batch['dst_disparity'] + 10) / (1/10.099975586 - 1/14.765625)
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                                 batch['dst_disparity']], dim=-1).permute(0, 3, 1, 2)
-
+                           gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
                                                                         1/x_src[:, 3][:, None],

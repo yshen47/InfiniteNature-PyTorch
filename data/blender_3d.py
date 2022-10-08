@@ -77,6 +77,7 @@ class Blender3dBase(Dataset, PRNGMixin):
                 return img_index, idx - cur_cumsum
 
     def __getitem__(self, global_index):
+        global_index = 0
         grid_id, idx = self.parse_idx(global_index)
         tgt_node = self.grids[grid_id].nodes[idx]
         tgt_neighbors = sorted(self.grids[grid_id][idx])
@@ -89,8 +90,8 @@ class Blender3dBase(Dataset, PRNGMixin):
             state.shuffle(tgt_neighbors)
             src_num = 1
             src_nodes = [self.grids[grid_id].nodes[k] for k in tgt_neighbors[:src_num]]
-        img_dst = np.array(Image.open(tgt_node['rgb_path']))/127.5-1.0
-        img_srcs = [np.array(Image.open(src_node['rgb_path']))/127.5-1.0 for src_node in src_nodes]
+        img_dst = np.array(Image.open(tgt_node['rgb_path']))/255.
+        img_srcs = [np.array(Image.open(src_node['rgb_path']))/255. for src_node in src_nodes]
 
         dm_dst = np.load(tgt_node['depth_path'])#[..., None]
         dm_srcs = [np.load(src_node['depth_path']) for src_node in src_nodes]

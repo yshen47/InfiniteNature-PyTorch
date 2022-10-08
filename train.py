@@ -11,7 +11,7 @@ import sys
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', help="config path",
-                        default="configs/google_earth.yaml")
+                        default="configs/clevr-infinite.yaml")
     parser.add_argument('--experiment_name_suffix', help="",
                         default="debug")
     args = parser.parse_args()
