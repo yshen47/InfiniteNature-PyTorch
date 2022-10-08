@@ -10,7 +10,7 @@ This codebase runs successfully in Python 3.7.13 and Ubuntu 22.03. First create 
 ```angular2html
 pip install -r requirement.txt
 pip install torch==1.12.1+cu102 torchvision==0.13.1+cu102 -f https://download.pytorch.org/whl/torch_stable.html
-pip install pytorch_lightning==1.7.7
+pip install pytorch_lightning==1.5.10
 ```
 
 BUILDING TF Mesh Renderer (Copy from their original codebase Readme.md)
