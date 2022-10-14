@@ -20,9 +20,9 @@ from modules.tensorflow_api import render_utils
 import tensorflow as tf
 import sys
 # Make sure python can find our libraries.
-sys.path.append('/home/yuan/PycharmProjects/infinite_nature')
+# sys.path.append('/home/yuan/PycharmProjects/infinite_nature')
 import os
-os.environ['TEST_SRCDIR'] = '/home/yuan/PycharmProjects/infinite_nature'
+# os.environ['TEST_SRCDIR'] = '/home/yuan/PycharmProjects/infinite_nature'
 from tf_mesh_renderer.mesh_renderer import rasterize_triangles
 
 
