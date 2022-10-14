@@ -150,7 +150,7 @@ class InfiniteNature(pl.LightningModule):
 
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
                            gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
-        z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
+        z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True, sample=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
                                                           1/x_src[:, 3][:, None],
                                                           batch["Ks"],

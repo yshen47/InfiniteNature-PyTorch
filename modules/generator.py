@@ -43,8 +43,8 @@ class SpadeGenerator(nn.Module):
         self.args = args
 
         if args.dataset == 'google_earth':
-            self.init_h = 16
-            self.init_w = 16
+            self.init_h = 8
+            self.init_w = 8
         elif args.dataset == 'clevr-infinite':
             self.init_h = 8
             self.init_w = 8
@@ -94,6 +94,12 @@ class SpadeGenerator(nn.Module):
                                   use_spectral_norm=self.args.use_spectral_norm,
                                   in_channel=5)
 
+        self.up_4 = SpadeResBlock(args,
+                                  channel_in=self.args.num_channel,
+                                  channel_out=self.args.num_channel,
+                                  use_spectral_norm=self.args.use_spectral_norm,
+                                  in_channel=5)
+
         self.conv = Conv2D(self.args.num_channel, 4, kernel_size=3, stride=1, bias=True, use_spectrual_norm=True)
 
     def forward(self, rgbd, mask, z):
@@ -126,6 +132,9 @@ class SpadeGenerator(nn.Module):
         x = F.interpolate(x, scale_factor=2)
 
         x = self.up_3(x, img)
+        x = F.interpolate(x, scale_factor=2)
+
+        x = self.up_4(x, img)
 
         x = F.leaky_relu(x, 0.2)
         x = sn_conv_padding(x, stride=1, kernel_size=3)
@@ -162,8 +171,12 @@ class SpadeEncoder(nn.Module):
         self.conv_5 = Conv2D(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True,
                              use_spectrual_norm=True)
         self.inst_norm_5 = torch.nn.InstanceNorm2d(8 * num_channel)
+
+        self.conv_6 = Conv2D(8 * num_channel, 8 * num_channel, kernel_size=3, stride=2, bias=True,
+                             use_spectrual_norm=True)
+        self.inst_norm_6 = torch.nn.InstanceNorm2d(8 * num_channel)
         if args.dataset == 'google_earth':
-            input_dense_dim = 8192
+            input_dense_dim = 2048 # 8192
         elif args.dataset == 'clevr-infinite':
             input_dense_dim = 2048
         else:
@@ -213,7 +226,12 @@ class SpadeEncoder(nn.Module):
         x6 = sn_conv_padding(x5, stride=2, kernel_size=3)
         x6 = self.conv_5(x6)
         x6 = self.inst_norm_5(x6)
-        features = F.leaky_relu(x6, 0.2)
+        x6 = F.leaky_relu(x6, 0.2)
+
+        x7 = sn_conv_padding(x6, stride=2, kernel_size=3)
+        x7 = self.conv_5(x7)
+        x7 = self.inst_norm_5(x7)
+        features = F.leaky_relu(x7, 0.2)
 
         bs, feature_dim, s1, s2 = features.shape
         features = features.permute(0, 2, 3, 1)
