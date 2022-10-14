@@ -13,7 +13,7 @@ from modules.tensorflow_api.render import render
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    config = OmegaConf.load("configs/clevr-infinite.yaml")
+    config = OmegaConf.load("configs/infinite_nature_default.yaml")
     model = instantiate_from_config(config.model).eval().cuda()
     # if not os.path.exists("infinite_nature_pytorch.ckpt"):
     #     torch.save(model.state_dict(), "infinite_nature_pytorch.ckpt")
