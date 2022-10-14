@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--config_path', help="config path",
                         default="configs/google_earth.yaml")
     parser.add_argument('--experiment_name_suffix', help="",
-                        default="debug")
+                        default="InfiniteNature-CLEVR-NeurIPS2022")
     args = parser.parse_args()
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     sys.path.append(os.getcwd())
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         "accelerator": 'gpu' if len(gpu_ids) > 0 else 'cpu'
     })
     trainer_kwargs["callbacks"] = [instantiate_from_config(callbacks_cfg[k]) for k in callbacks_cfg]
-    trainer_kwargs["callbacks"].append(CheckpointEveryNSteps(2500, os.path.join(logdir, "checkpoints", "last.ckpt")))
+    trainer_kwargs["callbacks"].append(CheckpointEveryNSteps(10000, os.path.join(logdir, "checkpoints", "last.ckpt")))
     trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
 
     trainer.num_sanity_val_steps = 2
