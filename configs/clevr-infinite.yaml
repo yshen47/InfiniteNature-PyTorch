@@ -5,7 +5,7 @@ model:
   gpu_ids: 0,   # -1 for cpu, make sure there is comma follows each number
   params:
 #    ckpt_path: None
-    learning_rate: 1e-3
+    learning_rate: 1e-4
     generator_config:
       embedding_size: 256
       use_spectral_norm: False
