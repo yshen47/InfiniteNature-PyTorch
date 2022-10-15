@@ -140,19 +140,22 @@ class InfiniteNature(pl.LightningModule):
                     pointer = torch.from_numpy(array)
 
     def training_step(self, batch, batch_idx):
-        x_src = torch.cat([batch['src_img'],
-                           1/batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
 
         if self.dataset == 'clevr-infinite':
-            gt_tgt_disparity_scaled = (batch['dst_disparity'] - 1/16) / (1/7 - 1/16)
+            gt_tgt_disparity_scaled = (1/batch['dst_dm'] - 1/16) / (1/7 - 1/16)
+            src_disparity_scaled = (1/batch['src_dm'] - 1/16) / (1/7 - 1/16)
         elif self.dataset == 'google_earth':
-            gt_tgt_disparity_scaled = (1/(1/batch['dst_disparity'] + 10) - 1/14.765625) / (1/10.099975586 - 1/14.765625)
+            gt_tgt_disparity_scaled = (1/(batch['dst_dm'] + 10) - 1/14.765625) / (1/10.099975586 - 1/14.765625)
+            src_disparity_scaled = (1/(batch['src_dm'] + 10) - 1/14.765625) / (1/10.099975586 - 1/14.765625)
+
+        x_src = torch.cat([batch['src_img'],
+                           src_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
 
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
                            gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True, sample=True)
         rendered_rgbd, mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                          1/x_src[:, 3][:, None],
+                                                          batch['src_dm'].permute(0, 3, 1, 2),
                                                           batch["Ks"],
                                                           batch["Ks"],
                                                           batch['T_src2tgt'])
@@ -168,19 +171,21 @@ class InfiniteNature(pl.LightningModule):
         opt_disc.step()
 
     def validation_step(self, batch, batch_idx):
-        x_src = torch.cat([batch['src_img'],
-                           1/batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
-
         if self.dataset == 'clevr-infinite':
-            gt_tgt_disparity_scaled = (batch['dst_disparity'] - 1/16) / (1/7 - 1/16)
+            gt_tgt_disparity_scaled = (1 / batch['dst_dm'] - 1 / 16) / (1 / 7 - 1 / 16)
+            src_disparity_scaled = (1 / batch['src_dm'] - 1 / 16) / (1 / 7 - 1 / 16)
         elif self.dataset == 'google_earth':
-            gt_tgt_disparity_scaled = (1/(1/batch['dst_disparity'] + 10) - 1/14.765625) / (1/10.099975586 - 1/14.765625)
+            gt_tgt_disparity_scaled = (1 / (batch['dst_dm'] + 10) - 1 / 14.765625) / (1 / 10.099975586 - 1 / 14.765625)
+            src_disparity_scaled = (1 / (batch['src_dm'] + 10) - 1 / 14.765625) / (1 / 10.099975586 - 1 / 14.765625)
+
+        x_src = torch.cat([batch['src_img'],
+                           src_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
 
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
+                                 gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                          1/x_src[:, 3][:, None],
+                                                          batch['src_dm'].permute(0, 3, 1, 2),
                                                           batch["Ks"],
                                                           batch["Ks"],
                                                           batch['T_src2tgt'])
@@ -330,19 +335,21 @@ class InfiniteNature(pl.LightningModule):
         return scaled_refined_disparity
 
     def log_images(self, batch, **kwargs):
-        x_src = torch.cat([batch['src_img'],
-                           1/batch['src_disparity']], dim=-1).permute(0, 3, 1, 2)
-
         if self.dataset == 'clevr-infinite':
-            gt_tgt_disparity_scaled = (batch['dst_disparity'] - 1/16) / (1/7 - 1/16)
+            gt_tgt_disparity_scaled = (1 / batch['dst_dm'] - 1 / 16) / (1 / 7 - 1 / 16)
+            src_disparity_scaled = (1 / batch['src_dm'] - 1 / 16) / (1 / 7 - 1 / 16)
         elif self.dataset == 'google_earth':
-            gt_tgt_disparity_scaled = (1/(1/batch['dst_disparity'] + 10) - 1/14.765625) / (1/10.099975586 - 1/14.765625)
+            gt_tgt_disparity_scaled = (1 / (batch['dst_dm'] + 10) - 1 / 14.765625) / (1 / 10.099975586 - 1 / 14.765625)
+            src_disparity_scaled = (1 / (batch['src_dm'] + 10) - 1 / 14.765625) / (1 / 10.099975586 - 1 / 14.765625)
+
+        x_src = torch.cat([batch['src_img'],
+                           src_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
 
         gt_tgt_rgbd = torch.cat([batch['dst_img'],
-                           gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
+                                 gt_tgt_disparity_scaled], dim=-1).permute(0, 3, 1, 2)
         z, mu, logvar = self.generator.style_encoding(x_src, return_mulogvar=True, sample=True)
         rendered_rgbd, extrapolation_mask = self.render_with_projection(x_src[:, :3][:, None],
-                                                          1/x_src[:, 3][:, None],
+                                                          batch['src_dm'].permute(0, 3, 1, 2),
                                                           batch["Ks"],
                                                           batch["Ks"],
                                                           batch['T_src2tgt'])
@@ -353,8 +360,8 @@ class InfiniteNature(pl.LightningModule):
         log["reconstructions"] = predicted_rgbd[:, :3]
         log["reconstruction_disparity"] = predicted_rgbd[:, 3:]
         log["gt_rgb"] = gt_tgt_rgbd[:, :3]
-        log["gt_disparity"] = gt_tgt_rgbd[:, 3:]
+        log["gt_disparity"] = gt_tgt_disparity_scaled.permute(0, 3, 1, 2)
 
         log["src_rgb"] = x_src[:, :3]
-        log["src_disparity"] = x_src[:, 3:]
+        log["src_disparity"] = src_disparity_scaled.permute(0, 3, 1, 2)
         return log

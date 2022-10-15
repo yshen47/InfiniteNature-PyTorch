@@ -129,8 +129,8 @@ class Blender3dBase(Dataset, PRNGMixin):
             "T_src2tgt": T_rels[0],
             "dst_img": img_dst,
             "src_img": img_srcs[0],
-            "dst_disparity": 1/dm_dst,
-            "src_disparity": 1/dm_srcs[0]
+            "dst_dm": dm_dst,
+            "src_dm": dm_srcs[0]
         }
 
         for k in example:

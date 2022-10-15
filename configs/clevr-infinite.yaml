@@ -4,7 +4,7 @@ model:
   seed: 0
   gpu_ids: 0,   # -1 for cpu, make sure there is comma follows each number
   params:
-#    ckpt_path: None
+    ckpt_path: logs/InfiniteNature-CLEVR-NeurIPS2022_learning_rate_0.0001_2022-10-14T15-03-27/checkpoints/last.ckpt
     learning_rate: 1e-4
     generator_config:
       embedding_size: 256
