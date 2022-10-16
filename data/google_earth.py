@@ -180,8 +180,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             "T_src2tgt": T_rels[0],
             "dst_img": img_dst,
             "src_img": img_srcs[0],
-            "dst_disparity": 1/dm_dst[..., None],
-            "src_disparity": 1/dm_srcs[0][..., None],
+            "dst_dm": dm_dst[..., None],
+            "src_dm": dm_srcs[0][..., None],
         }
         for k in example:
             example[k] = example[k].astype(np.float32)
