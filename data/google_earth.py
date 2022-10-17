@@ -43,6 +43,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
         self.grids = []
         self.cumulative_sum = [0]
         self.K = np.load(f"{self.dataset_dir}/K.npy")
+        self.K[0] = self.K[0] * self.image_resolution[1] / 512
+        self.K[1] = self.K[1] * self.image_resolution[0] / 512
         for grid_transform_path in sorted(Path(self.dataset_dir, self.split).glob("*")):
             if 'chicago' in str(grid_transform_path):
                 continue
@@ -52,6 +54,7 @@ class GoogleEarthBase(Dataset, PRNGMixin):
                 g = self.build_graph_from_transform(curr_transform['frames'], grid_transform_path)
                 self.grids.append(g)
                 self.cumulative_sum.append(len(g.nodes) + self.cumulative_sum[-1])
+
 
     def build_graph_from_transform(self, transforms, grid_transform_path):
         g_path = f"{self.dataset_dir}/cache/{grid_transform_path.name[:-4]}_graph_{self.split}.txt"
@@ -135,9 +138,6 @@ class GoogleEarthBase(Dataset, PRNGMixin):
 
         ## K
         h, w = img_dst.size[:2]
-        K = self.K
-        K = K * self.image_resolution[1] / w
-        K = K * self.image_resolution[0] / h
         for src_node in src_nodes:
             R_src = src_node["R"]
             t_src = src_node["t"]
@@ -146,8 +146,8 @@ class GoogleEarthBase(Dataset, PRNGMixin):
             T_src[:3, 3] = t_src
             T_rel = T_tgt @ np.linalg.inv(T_src)
             T_rels.append(T_rel)
-            Ks.append(K)
-            K_invs.append(np.linalg.inv(K))
+            Ks.append(self.K)
+            K_invs.append(np.linalg.inv(self.K))
 
         if self.image_resolution is not None and (self.image_resolution[0] != h or self.image_resolution[1] != w):
             ## img

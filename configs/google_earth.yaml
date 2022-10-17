@@ -6,6 +6,7 @@ model:
   params:
     ckpt_path: infinite_nature_pytorch.ckpt
     learning_rate: 1e-4
+    discriminative_loss_start_step: 100000
     generator_config:
       embedding_size: 256
       use_spectral_norm: False

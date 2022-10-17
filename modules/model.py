@@ -13,9 +13,10 @@ import os
 
 class InfiniteNature(pl.LightningModule):
 
-    def __init__(self, generator_config, learning_rate, ckpt_path=None, ignore_keys=()):
+    def __init__(self, generator_config, learning_rate, discriminative_loss_start_step=None, ckpt_path=None, ignore_keys=()):
         super().__init__()
         self.generator_config = generator_config
+        self.discriminative_loss_start_step = discriminative_loss_start_step
         self.dataset = self.generator_config.dataset
         self.learning_rate = learning_rate
         self.generator = Generator(generator_config)
@@ -160,7 +161,8 @@ class InfiniteNature(pl.LightningModule):
                                                           batch["Ks"],
                                                           batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, mask, z)
-        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train')
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train',
+                                                 use_discriminative_loss=self.global_step > self.discriminative_loss_start_step)
         self.log_dict(loss_dict, sync_dist=True, on_step=True, on_epoch=True, rank_zero_only=True)
         opt_ae, opt_disc = self.optimizers()
         opt_ae.zero_grad()
