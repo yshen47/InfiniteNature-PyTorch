@@ -2,6 +2,8 @@
 
 Unofficial PyTorch implementation of this ICCV 2021 Oral paper: [Infinite Nature: Perpetual View Generation of Natural Scenes from a Single Image](https://arxiv.org/abs/2012.09855) Check their project page for details: https://infinite-nature.github.io/
 
+## Colab Demo powered by PyTorch model developed in this codebase
+To showcase the performance of this PyTorch codebase, I provide a similar colab demo presented in the original InfiniteNature in [this link](https://colab.research.google.com/drive/1oFksO85fp2HiKB_vF91pSkpin0SzndOy?usp=sharing). Enjoy!
 ## Pre-trained Checkpoints
 Download the converted Pytorch weight from their tensorflow checkpoint from [this link](https://drive.google.com/file/d/14y4OKighwK82YpMxt6H4bPr_kNy2AB_N/view?usp=sharing) and save in project root directory.
 
