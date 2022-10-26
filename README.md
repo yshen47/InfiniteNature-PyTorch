@@ -51,5 +51,5 @@ For each dataset, we need to first prepare a config file and then write a custom
     python train.py
 ```
 
-For details about GoogleEarth-Infinite dataset, please check the paper [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
+For details about GoogleEarth-Infinite dataset, please check our NeurIPS 2022 project [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
 
