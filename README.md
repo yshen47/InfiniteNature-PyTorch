@@ -1,7 +1,9 @@
 # InfiniteNature-PyTorch
 
-Unofficial PyTorch implementation of this ICCV 2021 Oral paper: [Infinite Nature: Perpetual View Generation of Natural Scenes from a Single Image](https://arxiv.org/abs/2012.09855) Check their project page for details: https://infinite-nature.github.io/
+Unofficial PyTorch implementation of this ICCV 2021 Oral paper: [Infinite Nature: Perpetual View Generation of Natural Scenes from a Single Image](https://arxiv.org/abs/2012.09855), developed by [Yuan Shen](https://yshen47.github.io/). Check their project page for details: https://infinite-nature.github.io/.
 
+## Colab Demo powered by our PyTorch model
+To showcase the performance of this PyTorch codebase, I provide a similar colab demo presented in the original InfiniteNature in [this Colab link](https://colab.research.google.com/drive/1oFksO85fp2HiKB_vF91pSkpin0SzndOy?usp=sharing). Enjoy!
 ## Pre-trained Checkpoints
 Download the converted Pytorch weight from their tensorflow checkpoint from [this link](https://drive.google.com/file/d/14y4OKighwK82YpMxt6H4bPr_kNy2AB_N/view?usp=sharing) and save in project root directory.
 
@@ -49,5 +51,5 @@ For each dataset, we need to first prepare a config file and then write a custom
     python train.py
 ```
 
-For details about GoogleEarth-Infinite dataset, please check the paper [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
+For details about GoogleEarth-Infinite dataset, please check our NeurIPS 2022 project [SGAM: Building a Virtual 3D World through Simultaneous Generation and Mapping](https://github.com/yshen47/SGAM).
 
