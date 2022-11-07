@@ -45,7 +45,7 @@ class InfiniteNature(pl.LightningModule):
                                 lr=lr, betas=(0.5, 0.9))
         return opt_g, opt_disc
 
-    def init_from_ckpt(self, path, ignore_keys=('loss')):
+    def init_from_ckpt(self, path, ignore_keys=('spade_discriminator_0', 'spade_discriminator_1')):
         sd = torch.load(path, map_location="cpu")
         if "state_dict" in sd:
             sd = sd['state_dict']
@@ -162,7 +162,8 @@ class InfiniteNature(pl.LightningModule):
                                                           batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, mask, z)
         loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'train',
-                                                 use_discriminative_loss=self.global_step > self.discriminative_loss_start_step)
+                                                 use_discriminative_loss=self.global_step > self.discriminative_loss_start_step,
+                                                 last_layer=self.generator.spade_network_noenc.spade_generator.conv.conv2d.weight)
         self.log_dict(loss_dict, sync_dist=True, on_step=True, on_epoch=True, rank_zero_only=True)
         opt_ae, opt_disc = self.optimizers()
         opt_ae.zero_grad()
@@ -192,7 +193,8 @@ class InfiniteNature(pl.LightningModule):
                                                           batch["Ks"],
                                                           batch['T_src2tgt'])
         predicted_rgbd = self(rendered_rgbd, extrapolation_mask, z)
-        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar), self.perceptual_loss, 'val')
+        loss_dict = compute_infinite_nature_loss(predicted_rgbd, gt_tgt_rgbd, self.discriminate, (mu, logvar),
+                                                 self.perceptual_loss, 'val', last_layer=self.generator.spade_network_noenc.spade_generator.conv.conv2d.weight)
         self.log_dict(loss_dict, on_epoch=True, on_step=True, sync_dist=True)
 
         ssim = SSIM()

@@ -2,8 +2,22 @@ import tensorflow as tf
 import torch.nn.functional
 
 
+def calculate_adaptive_weight(nll_loss, g_loss, last_layer=None):
+    if last_layer is not None:
+        nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
+        g_grads = torch.autograd.grad(g_loss, last_layer, retain_graph=True)[0]
+    else:
+        nll_grads = torch.autograd.grad(nll_loss, last_layer[0], retain_graph=True)[0]
+        g_grads = torch.autograd.grad(g_loss, last_layer[0], retain_graph=True)[0]
+
+    d_weight = torch.norm(nll_grads) / (torch.norm(g_grads) + 1e-4)
+    d_weight = torch.clamp(d_weight, 0.0, 1e4).detach()
+    return d_weight
+
+
 def compute_infinite_nature_loss(
-        generated_rgbd, gt_rgbd, discriminate_f, mu_logvar, perceptual_loss_f, split, use_discriminative_loss=True):
+        generated_rgbd, gt_rgbd, discriminate_f, mu_logvar, perceptual_loss_f, split, use_discriminative_loss=True,
+        last_layer=None):
     """Computes loss between a generated RGBD sequence and the ground truth.
 
     Lambda terms are the default values used during the original submission.
@@ -43,6 +57,11 @@ def compute_infinite_nature_loss(
     rgbd_loss = torch.mean(torch.abs(generated_rgbd - gt_rgbd))
     perceptual_loss = perceptual_loss_f(generated_rgbd[:, :3], gt_rgbd[:, :3]).mean()
 
+    try:
+        d_weight = calculate_adaptive_weight(rgbd_loss, fool_d_loss, last_layer=last_layer)
+    except RuntimeError:
+        d_weight = torch.tensor(0.0)
+
     loss_dict = {}
     loss_dict[f"{split}/disc_loss"] = disc_loss.detach()
     loss_dict[f"{split}/adversarial_loss"] = fool_d_loss.detach()
@@ -53,9 +72,9 @@ def compute_infinite_nature_loss(
 
     total_loss = (1e-2 * perceptual_loss +
                   10.0 * feature_matching_loss + 0.05 * kld_loss +
-                  (1.5 if use_discriminative_loss else 0) * fool_d_loss + 0.5 * rgbd_loss)
+                  (1.5 if use_discriminative_loss else 0) * fool_d_loss * d_weight + 0.5 * rgbd_loss)
     total_disc_loss = 1.5 * disc_loss
-    loss_dict[f"{split}/total_generator_loss"] = total_loss
+    loss_dict[f"{split}/total_generator_loss"] = total_loss * d_weight
     loss_dict[f"{split}/total_discriminator_loss"] = total_disc_loss * (1 if use_discriminative_loss else 0)
     return loss_dict
 

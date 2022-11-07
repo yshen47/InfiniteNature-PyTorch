@@ -3,7 +3,7 @@ import sys
 # Make sure python can find our libraries.
 sys.path.append('/home/yuan/PycharmProjects/infinite_nature/tf_mesh_renderer/mesh_renderer')
 from omegaconf import OmegaConf
-from data.utils.utils import instantiate_from_config
+from infiniate_nature_data.utils.utils import instantiate_from_config
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

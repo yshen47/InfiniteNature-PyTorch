@@ -1,6 +1,6 @@
 import copy
 import shutil
-from data.utils.utils import *
+from infiniate_nature_data.utils.utils import *
 import os
 from pytorch_lightning.loggers import WandbLogger
 import signal
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     # add callback which sets up log directory
     default_callbacks_cfg = {
         "image_logger": {
-            "target": "data.utils.utils.ImageLogger",
+            "target": "infiniate_nature_data.utils.utils.ImageLogger",
             "params": {
                 "batch_frequency": 500,
                 "max_images": 4,
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     data = instantiate_from_config(config.data)
 
-    # config.model.params.data_config = config.data.params
+    # config.model.params.data_config = config.infiniate_nature_data.params
     model = instantiate_from_config(config.model)
     model.logdir = logdir
 
